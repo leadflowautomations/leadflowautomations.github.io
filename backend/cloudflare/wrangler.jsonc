@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "leadflow-assistant-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-31",
+  "ai": {
+    "binding": "AI"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "leadflow-leads",
+      "database_id": "REPLACE_AFTER_D1_CREATE"
+    }
+  ]
+}
