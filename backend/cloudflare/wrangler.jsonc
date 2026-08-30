@@ -12,5 +12,8 @@
       "database_name": "leadflow-leads",
       "database_id": "REPLACE_AFTER_D1_CREATE"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  }
 }
