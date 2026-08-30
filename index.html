@@ -1,415 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lead Flow Automation | AI Chatbots for Small Businesses</title>
-    <style>
-        :root {
-            --bg: #0a0f1e;
-            --surface: #111827;
-            --surface-hover: #1f2937;
-            --text: #e5e7eb;
-            --text-muted: #9ca3af;
-            --accent: #3b82f6;
-            --accent-hover: #2563eb;
-            --border: #1f2937;
-            --radius: 12px;
-            --max-width: 1100px;
-        }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-        }
-        .container {
-            max-width: var(--max-width);
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-        header {
-            padding: 20px 0;
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            background: rgba(10, 15, 30, 0.9);
-            backdrop-filter: blur(10px);
-            z-index: 100;
-        }
-        .header-inner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .logo {
-            font-weight: 700;
-            font-size: 1.5rem;
-            color: var(--accent);
-            text-decoration: none;
-        }
-        .nav-links {
-            display: flex;
-            gap: 1.5rem;
-        }
-        .nav-links a {
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.95rem;
-            transition: color 0.2s;
-        }
-        .nav-links a:hover {
-            color: var(--text);
-        }
-        .hero {
-            padding: 80px 0;
-            text-align: center;
-        }
-        .hero h1 {
-            font-size: 3rem;
-            font-weight: 800;
-            line-height: 1.2;
-            margin-bottom: 20px;
-        }
-        .hero p {
-            font-size: 1.25rem;
-            color: var(--text-muted);
-            max-width: 700px;
-            margin: 0 auto 30px;
-        }
-        .btn {
-            display: inline-block;
-            background: var(--accent);
-            color: white;
-            padding: 12px 30px;
-            border-radius: 30px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: background 0.2s;
-            border: none;
-            cursor: pointer;
-        }
-        .btn:hover {
-            background: var(--accent-hover);
-        }
-        .section {
-            padding: 60px 0;
-        }
-        .section h2 {
-            font-size: 2rem;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-        }
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 25px;
-            transition: transform 0.2s, background 0.2s;
-        }
-        .card:hover {
-            background: var(--surface-hover);
-            transform: translateY(-5px);
-        }
-        .card h3 {
-            font-size: 1.2rem;
-            margin-bottom: 10px;
-        }
-        .card p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-        }
-        .pricing-table {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            justify-content: center;
-        }
-        .pricing-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 30px;
-            width: 280px;
-            text-align: center;
-        }
-        .pricing-card h3 {
-            font-size: 1.5rem;
-            margin-bottom: 10px;
-        }
-        .price {
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: var(--accent);
-        }
-        .pricing-card ul {
-            list-style: none;
-            margin: 20px 0;
-            text-align: left;
-        }
-        .pricing-card li {
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-            color: var(--text-muted);
-        }
-        .pricing-card li:last-child {
-            border-bottom: none;
-        }
-        .chat-demo {
-            max-width: 600px;
-            margin: 0 auto;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-        }
-        .chat-header {
-            background: var(--accent);
-            color: white;
-            padding: 15px 20px;
-            font-weight: 600;
-        }
-        .chat-body {
-            height: 300px;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .message {
-            max-width: 80%;
-            padding: 10px 15px;
-            border-radius: 15px;
-            font-size: 0.95rem;
-        }
-        .bot-message {
-            background: var(--surface-hover);
-            align-self: flex-start;
-            border-bottom-left-radius: 3px;
-        }
-        .user-message {
-            background: var(--accent);
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 3px;
-        }
-        .chat-input {
-            display: flex;
-            border-top: 1px solid var(--border);
-        }
-        .chat-input input {
-            flex: 1;
-            padding: 15px;
-            background: transparent;
-            border: none;
-            color: var(--text);
-            outline: none;
-        }
-        .chat-input button {
-            background: var(--accent);
-            border: none;
-            color: white;
-            padding: 0 20px;
-            cursor: pointer;
-        }
-        .contact {
-            text-align: center;
-        }
-        .contact a {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 600;
-        }
-        footer {
-            text-align: center;
-            padding: 30px 0;
-            border-top: 1px solid var(--border);
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 2rem;
-            }
-            .nav-links {
-                display: none;
-            }
-            .pricing-card {
-                width: 100%;
-                max-width: 350px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lead Flow Automation builds AI chatbots and lead automation systems for small businesses.">
+  <meta name="theme-color" content="#070b14">
+  <title>Lead Flow Automation | AI-Powered Lead Systems</title>
+  <style>
+    :root{
+      --bg:#070b14;--bg-soft:#0b1220;--surface:#101827;--surface-2:#141e2f;
+      --text:#f5f7fb;--muted:#9aa7ba;--line:rgba(148,163,184,.16);
+      --accent:#5b8cff;--accent-2:#7c5cff;--accent-hover:#7aa2ff;
+      --success:#4ade80;--radius:20px;--max:1160px;--shadow:0 24px 80px rgba(0,0,0,.35)
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:radial-gradient(circle at 50% -10%,rgba(91,140,255,.13),transparent 34%),var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+    a{color:inherit;text-decoration:none}.container{width:min(var(--max),calc(100% - 40px));margin:auto}
+    .nav{position:sticky;top:0;z-index:1000;background:rgba(7,11,20,.76);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}
+    .nav-inner{height:76px;display:flex;align-items:center;justify-content:space-between;gap:28px}
+    .brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:-.03em;font-size:1.08rem}.brand-mark{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;box-shadow:0 8px 25px rgba(91,140,255,.3)}.brand-mark span{width:13px;height:13px;border:2px solid white;border-radius:4px;display:block}
+    .nav-links{display:flex;gap:25px;align-items:center}.nav-links a{font-size:.9rem;color:var(--muted);transition:.2s}.nav-links a:hover{color:var(--text)}
+    .nav-cta{padding:10px 16px;border:1px solid rgba(124,92,255,.45);border-radius:12px;color:var(--text)!important;background:rgba(91,140,255,.08)}
+    .menu-btn{display:none;background:transparent;border:1px solid var(--line);color:var(--text);border-radius:12px;width:42px;height:42px;font-size:1.25rem}
+    .hero{padding:92px 0 76px;position:relative}.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:62px;align-items:center}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;padding:7px 11px;border:1px solid rgba(91,140,255,.28);border-radius:999px;background:rgba(91,140,255,.07);color:#b9cbff;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 14px rgba(74,222,128,.7)}
+    h1{font-size:clamp(2.7rem,6vw,5rem);line-height:1.03;letter-spacing:-.065em;margin:22px 0 22px;max-width:760px}h1 .gradient{background:linear-gradient(100deg,#fff 10%,#a9c0ff 52%,#a894ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .hero-copy{font-size:1.15rem;color:var(--muted);max-width:650px}.actions{display:flex;flex-wrap:wrap;gap:13px;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:13px 19px;border-radius:13px;border:1px solid transparent;font-weight:750;font-size:.92rem;transition:transform .2s,background .2s,border-color .2s;cursor:pointer}.btn:hover{transform:translateY(-2px)}.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 14px 35px rgba(91,140,255,.2)}.btn-primary:hover{filter:brightness(1.08)}.btn-secondary{background:rgba(255,255,255,.035);border-color:var(--line)}
+    .hero-note{margin-top:15px;color:#758399;font-size:.82rem}.hero-note strong{color:#a9b6c9}
+    .visual{position:relative}.dashboard{background:linear-gradient(145deg,rgba(20,30,47,.96),rgba(10,16,27,.96));border:1px solid rgba(148,163,184,.18);border-radius:24px;padding:18px;box-shadow:var(--shadow);transform:rotate(1.2deg)}.window-bar{display:flex;align-items:center;gap:6px;padding:2px 0 15px}.window-dot{width:8px;height:8px;border-radius:50%;background:#39465a}.window-title{margin-left:auto;color:#718096;font-size:.7rem}.dash-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:17px}.dash-label{font-size:.74rem;color:#8c9ab0}.live{font-size:.68rem;color:#b9f6ca;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.18);padding:5px 8px;border-radius:999px}.metric{background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:15px;padding:16px;margin-bottom:11px}.metric small{color:#77869d;font-size:.7rem}.metric strong{display:block;font-size:1.55rem;margin:3px 0}.bar{height:7px;background:#1c2738;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;width:76%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:99px}.chat-mini{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:#0b1220}.chat-mini-head{padding:11px 13px;background:rgba(91,140,255,.13);font-size:.75rem;font-weight:700}.mini-msg{padding:10px 12px;font-size:.7rem;color:#aeb9c9}.mini-msg.user{margin:7px 10px 0 auto;width:max-content;max-width:75%;background:#315fca;color:white;border-radius:12px 12px 3px 12px}.mini-msg.bot{margin:7px 10px;background:#172236;border-radius:12px 12px 12px 3px}.float-badge{position:absolute;right:-18px;bottom:24px;background:#101827;border:1px solid rgba(148,163,184,.2);border-radius:15px;padding:11px 13px;box-shadow:var(--shadow);font-size:.73rem}.float-badge b{display:block;font-size:.9rem}.float-badge span{color:var(--muted)}
+    .proof{padding:15px 0 30px}.proof-inner{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:23px 0;display:flex;justify-content:center;gap:42px;flex-wrap:wrap;color:#7f8ca0;font-size:.82rem}.proof-inner span{display:flex;align-items:center;gap:8px}.check{color:var(--success);font-weight:900}
+    section.section{padding:92px 0}.section-head{text-align:center;max-width:730px;margin:0 auto 42px}.kicker{color:#91adff;font-weight:750;font-size:.78rem;text-transform:uppercase;letter-spacing:.09em}.section h2{font-size:clamp(2rem,4vw,3rem);letter-spacing:-.045em;line-height:1.1;margin:9px 0 13px}.section-head p{color:var(--muted);font-size:1rem}
+    .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:17px}.card{background:linear-gradient(145deg,rgba(16,24,39,.96),rgba(12,18,30,.96));border:1px solid var(--line);border-radius:var(--radius);padding:27px;transition:transform .25s,border-color .25s,background .25s}.card:hover{transform:translateY(-5px);border-color:rgba(91,140,255,.3);background:linear-gradient(145deg,rgba(20,31,50,.98),rgba(12,18,30,.98))}.icon{width:43px;height:43px;border-radius:13px;display:grid;place-items:center;background:rgba(91,140,255,.1);border:1px solid rgba(91,140,255,.18);font-size:1.15rem;margin-bottom:19px}.card h3{font-size:1.05rem;margin-bottom:9px}.card p{font-size:.9rem;color:var(--muted)}.card ul{list-style:none;margin-top:17px}.card li{font-size:.82rem;color:#aab5c5;margin:8px 0}.card li:before{content:"✓";color:var(--success);font-weight:800;margin-right:8px}
+    .process{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.step{padding:22px;border:1px solid var(--line);border-radius:17px;background:rgba(255,255,255,.018)}.step-num{font-size:.72rem;color:#8da9ff;font-weight:800}.step h3{margin:7px 0;font-size:.98rem}.step p{font-size:.82rem;color:var(--muted)}
+    .pricing{display:grid;grid-template-columns:repeat(3,1fr);gap:17px;align-items:stretch}.price-card{position:relative}.price-card.featured{border-color:rgba(91,140,255,.45);box-shadow:0 20px 70px rgba(47,79,160,.12)}.popular{position:absolute;top:17px;right:17px;background:rgba(91,140,255,.12);color:#adc2ff;border:1px solid rgba(91,140,255,.25);font-size:.65rem;padding:5px 8px;border-radius:999px;font-weight:800;text-transform:uppercase}.price{font-size:2.25rem;font-weight:850;letter-spacing:-.04em;margin:7px 0}.price small{font-size:.76rem;font-weight:500;color:#7e8ba0}.price-desc{color:var(--muted);font-size:.82rem;min-height:43px}.price-card .btn{width:100%;margin-top:18px}.price-card ul{margin:20px 0 0}.price-card li{border-top:1px solid var(--line);padding:9px 0}
+    .demo-wrap{display:grid;grid-template-columns:.75fr 1.25fr;gap:24px;align-items:stretch}.demo-info{padding:28px}.demo-info h3{font-size:1.35rem;margin:8px 0 12px}.demo-info p{color:var(--muted);font-size:.9rem}.demo-points{margin-top:20px;display:grid;gap:10px}.demo-points div{font-size:.82rem;color:#b6c1d0}.demo-points b{color:var(--success);margin-right:7px}.chat{background:#0d1625;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow)}.chat-head{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}.bot-avatar{width:34px;height:34px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;font-size:.8rem;font-weight:800}.chat-head b{font-size:.86rem}.chat-head small{display:block;color:#6f7f94;font-size:.68rem}.online{margin-left:auto;color:#80e99b;font-size:.68rem}.chat-body{height:310px;padding:17px;display:flex;flex-direction:column;gap:10px;overflow:auto}.bubble{max-width:82%;padding:10px 13px;border-radius:14px;font-size:.8rem}.bubble.bot{align-self:flex-start;background:#182437;color:#c9d2df;border-bottom-left-radius:4px}.bubble.user{align-self:flex-end;background:#376ad5;color:white;border-bottom-right-radius:4px}.suggestions{display:flex;gap:7px;flex-wrap:wrap;padding:0 17px 12px}.suggestion{background:transparent;color:#8da9ff;border:1px solid rgba(91,140,255,.25);border-radius:999px;padding:6px 9px;font-size:.68rem;cursor:pointer}.chat-form{display:flex;border-top:1px solid var(--line);padding:10px;gap:8px}.chat-form input{flex:1;background:#101b2b;border:1px solid var(--line);border-radius:11px;padding:11px;color:white;outline:none}.chat-form button{border:0;border-radius:11px;padding:0 15px;background:var(--accent);color:white;font-weight:750;cursor:pointer}
+    .faq{max-width:800px;margin:auto;display:grid;gap:10px}.faq details{background:rgba(255,255,255,.018);border:1px solid var(--line);border-radius:15px;padding:17px 19px}.faq summary{cursor:pointer;font-weight:700;font-size:.9rem;list-style:none}.faq summary::-webkit-details-marker{display:none}.faq summary:after{content:"+";float:right;color:#8392a7;font-size:1.1rem}.faq details[open] summary:after{content:"−"}.faq p{color:var(--muted);font-size:.83rem;padding-top:11px;max-width:680px}
+    .contact-box{position:relative;overflow:hidden;border:1px solid rgba(91,140,255,.25);border-radius:26px;padding:55px 30px;text-align:center;background:radial-gradient(circle at 50% 0%,rgba(91,140,255,.15),transparent 58%),linear-gradient(145deg,#0f192a,#0a111e)}.contact-box:before,.contact-box:after{content:"";position:absolute;border:1px solid rgba(124,92,255,.13);border-radius:50%;pointer-events:none}.contact-box:before{width:300px;height:300px;left:-160px;top:-170px}.contact-box:after{width:250px;height:250px;right:-130px;bottom:-160px}.contact-box h2{font-size:clamp(2rem,4vw,3.1rem);margin-bottom:12px}.contact-box p{color:var(--muted);max-width:620px;margin:auto}.contact-email{display:inline-block;margin-top:18px;color:#b9c9ff;font-weight:700}.contact-box .actions{justify-content:center}
+    footer{padding:32px 0;border-top:1px solid var(--line);color:#728096;font-size:.75rem}.footer-inner{display:flex;justify-content:space-between;gap:15px;align-items:center}.footer-links{display:flex;gap:17px}.footer-links a:hover{color:white}
+    .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s ease}.reveal.visible{opacity:1;transform:none}
+    @media(max-width:900px){.hero-grid,.demo-wrap{grid-template-columns:1fr}.hero{padding-top:70px}.visual{max-width:650px;margin:auto}.cards,.pricing{grid-template-columns:1fr 1fr}.process{grid-template-columns:1fr 1fr}.nav-links{display:none}.menu-btn{display:block}.nav.open .nav-links{display:flex;position:absolute;left:20px;right:20px;top:70px;background:#0c1422;border:1px solid var(--line);border-radius:16px;padding:14px;flex-direction:column;align-items:stretch}.nav.open .nav-links a{padding:9px}.nav.open .nav-cta{text-align:center}}
+    @media(max-width:620px){.container{width:min(var(--max),calc(100% - 28px))}.nav-inner{height:68px}.brand{font-size:.95rem}.brand-mark{width:33px;height:33px}.hero{padding:58px 0 50px}h1{font-size:2.55rem}.hero-copy{font-size:1rem}.actions .btn{width:100%}.float-badge{right:4px}.proof-inner{justify-content:flex-start;gap:12px}.cards,.pricing,.process{grid-template-columns:1fr}.section{padding:70px 0!important}.section-head{margin-bottom:30px}.chat-body{height:280px}.footer-inner{flex-direction:column;text-align:center}}
+  </style>
 </head>
 <body>
-    <header>
-        <div class="container header-inner">
-            <a href="#" class="logo">Lead Flow Automation</a>
-            <nav class="nav-links">
-                <a href="#about">About</a>
-                <a href="#services">Services</a>
-                <a href="#pricing">Pricing</a>
-                <a href="#demo">Demo</a>
-                <a href="#contact">Contact</a>
-            </nav>
-        </div>
-    </header>
+  <header class="nav" id="top">
+    <div class="container nav-inner">
+      <a class="brand" href="#top"><span class="brand-mark"><span></span></span>Lead Flow Automation</a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#services">Services</a><a href="#process">How it works</a><a href="#pricing">Pricing</a><a href="#demo">Demo</a><a href="#faq">FAQ</a><a class="nav-cta" href="#contact">Let's talk →</a>
+      </nav>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu">☰</button>
+    </div>
+  </header>
 
+  <main>
     <section class="hero">
-        <div class="container">
-            <h1>AI Chatbots That Turn Your Website Into a 24/7 Sales Machine</h1>
-            <p>Get instant answers for your customers, capture more leads, and save 10+ hours every week — without hiring extra staff.</p>
-            <a href="mailto:leadflowautomation.dav@gmail.com?subject=AI%20Chatbot%20Consultation" class="btn">Book a Free 15‑Minute Consultation</a>
+      <div class="container hero-grid">
+        <div class="reveal">
+          <div class="eyebrow"><span class="dot"></span> AI automation for growing businesses</div>
+          <h1>Turn more conversations into <span class="gradient">qualified leads.</span></h1>
+          <p class="hero-copy">I build practical AI chatbot and lead-flow systems that answer customers, capture enquiries and help small businesses respond faster — around the clock.</p>
+          <div class="actions"><a class="btn btn-primary" href="mailto:leadflowautomation.dav@gmail.com?subject=Free%2015-Minute%20Consultation">Book a free consultation <span>↗</span></a><a class="btn btn-secondary" href="#demo">Try the live demo ↓</a></div>
+          <p class="hero-note"><strong>No complicated setup.</strong> Start with one workflow and scale as your business grows.</p>
         </div>
+        <div class="visual reveal">
+          <div class="dashboard">
+            <div class="window-bar"><i class="window-dot"></i><i class="window-dot"></i><i class="window-dot"></i><span class="window-title">lead-flow / overview</span></div>
+            <div class="dash-top"><div class="dash-label">LEAD FLOW OVERVIEW</div><div class="live">● SYSTEM READY</div></div>
+            <div class="metric"><small>Automated enquiries</small><strong>24/7</strong><div class="bar"><i></i></div></div>
+            <div class="metric"><small>Lead capture flow</small><strong>Active</strong><div class="bar"><i style="width:91%"></i></div></div>
+            <div class="chat-mini"><div class="chat-mini-head">✦ LeadFlow Assistant</div><div class="mini-msg bot">Hi! How can I help you today?</div><div class="mini-msg user">I want to know your pricing.</div><div class="mini-msg bot">Absolutely. I can guide you to the right package or connect you with David.</div></div>
+          </div>
+          <div class="float-badge"><b>Faster follow-up</b><span>Less manual repetition.</span></div>
+        </div>
+      </div>
     </section>
 
-    <section id="about" class="section">
-        <div class="container">
-            <h2>About Me</h2>
-            <p style="max-width: 700px; margin: 0 auto; text-align: center; color: var(--text-muted);">
-                Hi, I’m <strong>David Elijah</strong>, founder of Lead Flow Automation. I build custom AI chatbots for small businesses that answer questions, qualify leads, and integrate with your existing tools. My goal is simple: help you automate repetitive customer interactions so you can focus on growing your business.
-            </p>
+    <div class="proof"><div class="container proof-inner"><span><b class="check">✓</b> Website chatbots</span><span><b class="check">✓</b> Lead capture</span><span><b class="check">✓</b> CRM & email workflows</span><span><b class="check">✓</b> Analytics & optimisation</span></div></div>
+
+    <section class="section" id="services">
+      <div class="container">
+        <div class="section-head reveal"><div class="kicker">What I build</div><h2>Automation that does useful work.</h2><p>Not just a chatbot. The goal is a connected customer journey that removes repetitive work and helps you follow up consistently.</p></div>
+        <div class="cards">
+          <article class="card reveal"><div class="icon">✦</div><h3>Custom AI Chatbots</h3><p>Helpful website assistants designed around your services, FAQs and customer questions.</p><ul><li>Business-specific knowledge</li><li>Conversation flows</li><li>Website-ready experience</li></ul></article>
+          <article class="card reveal"><div class="icon">↗</div><h3>Lead Capture Systems</h3><p>Turn conversations into structured enquiries instead of letting interested visitors disappear.</p><ul><li>Lead qualification questions</li><li>Contact detail collection</li><li>Email / sheet / CRM handoff</li></ul></article>
+          <article class="card reveal"><div class="icon">◌</div><h3>Automation & Optimisation</h3><p>Connect the moving parts and improve the workflow as you learn what customers actually need.</p><ul><li>Follow-up workflows</li><li>Conversation insights</li><li>Ongoing improvements</li></ul></article>
         </div>
+      </div>
     </section>
 
-    <section id="services" class="section">
-        <div class="container">
-            <h2>What I Do</h2>
-            <div class="grid">
-                <div class="card">
-                    <h3>Custom AI Chatbot Development</h3>
-                    <p>Trained on your FAQs and business info, integrated with your website, Messenger, or WhatsApp.</p>
-                </div>
-                <div class="card">
-                    <h3>Lead Capture & CRM Integration</h3>
-                    <p>Collect visitor details and send them straight to your email, Google Sheets, or CRM.</p>
-                </div>
-                <div class="card">
-                    <h3>Analytics & Optimization</h3>
-                    <p>Track conversations, see what customers ask most, and continuously improve performance.</p>
-                </div>
-            </div>
+    <section class="section" id="process">
+      <div class="container">
+        <div class="section-head reveal"><div class="kicker">Simple process</div><h2>From idea to working system.</h2><p>A clear four-step process keeps projects focused and practical.</p></div>
+        <div class="process">
+          <div class="step reveal"><span class="step-num">01 / DISCOVER</span><h3>Understand the business</h3><p>We map your offers, common questions, customers and repetitive tasks.</p></div>
+          <div class="step reveal"><span class="step-num">02 / DESIGN</span><h3>Design the flow</h3><p>We plan the conversations, lead questions, handoffs and customer experience.</p></div>
+          <div class="step reveal"><span class="step-num">03 / BUILD</span><h3>Build & connect</h3><p>The chatbot and supporting automation are implemented and tested.</p></div>
+          <div class="step reveal"><span class="step-num">04 / IMPROVE</span><h3>Launch & optimise</h3><p>We review what works, fix friction and improve the system over time.</p></div>
         </div>
+      </div>
     </section>
 
-    <section id="pricing" class="section">
-        <div class="container">
-            <h2>Pricing</h2>
-            <div class="pricing-table">
-                <div class="pricing-card">
-                    <h3>Starter</h3>
-                    <div class="price">$750</div>
-                    <ul>
-                        <li>One AI chatbot</li>
-                        <li>Trained on up to 20 FAQs</li>
-                        <li>Website embed code</li>
-                        <li>1 revision</li>
-                        <li>Delivery in 5 days</li>
-                    </ul>
-                    <a href="mailto:leadflowautomation.dav@gmail.com?subject=Starter%20Package%20Inquiry" class="btn">Get Started</a>
-                </div>
-                <div class="pricing-card">
-                    <h3>Professional</h3>
-                    <div class="price">$1,500</div>
-                    <ul>
-                        <li>Everything in Starter</li>
-                        <li>Advanced conversational flow</li>
-                        <li>Email/CRM integration</li>
-                        <li>2 revisions</li>
-                        <li>30 days support</li>
-                    </ul>
-                    <a href="mailto:leadflowautomation.dav@gmail.com?subject=Professional%20Package%20Inquiry" class="btn">Get Started</a>
-                </div>
-                <div class="pricing-card">
-                    <h3>Premium</h3>
-                    <div class="price">$2,500</div>
-                    <ul>
-                        <li>Everything in Professional</li>
-                        <li>Multi‑platform deployment</li>
-                        <li>Analytics dashboard</li>
-                        <li>3 months maintenance</li>
-                        <li>Priority support</li>
-                    </ul>
-                    <a href="mailto:leadflowautomation.dav@gmail.com?subject=Premium%20Package%20Inquiry" class="btn">Get Started</a>
-                </div>
-            </div>
+    <section class="section" id="pricing">
+      <div class="container">
+        <div class="section-head reveal"><div class="kicker">Starting packages</div><h2>Choose the level that fits.</h2><p>Clear starting points for businesses that want to move from manual replies toward a smarter customer workflow.</p></div>
+        <div class="pricing">
+          <article class="card price-card reveal"><h3>Starter</h3><div class="price">$750 <small>one-time</small></div><p class="price-desc">A focused chatbot for answering common customer questions.</p><ul><li>One AI chatbot</li><li>Up to 20 FAQs</li><li>Website embed</li><li>1 revision</li><li>5-day target delivery</li></ul><a class="btn btn-secondary" href="mailto:leadflowautomation.dav@gmail.com?subject=Starter%20Package%20Inquiry">Choose Starter →</a></article>
+          <article class="card price-card featured reveal"><span class="popular">Most popular</span><h3>Professional</h3><div class="price">$1,500 <small>one-time</small></div><p class="price-desc">A stronger conversational system with lead capture and integrations.</p><ul><li>Everything in Starter</li><li>Advanced conversation flow</li><li>Email / CRM integration</li><li>2 revisions</li><li>30 days support</li></ul><a class="btn btn-primary" href="mailto:leadflowautomation.dav@gmail.com?subject=Professional%20Package%20Inquiry">Choose Professional →</a></article>
+          <article class="card price-card reveal"><h3>Premium</h3><div class="price">$2,500 <small>one-time</small></div><p class="price-desc">A broader automation setup for businesses ready to scale.</p><ul><li>Everything in Professional</li><li>Multi-platform deployment</li><li>Analytics dashboard</li><li>3 months maintenance</li><li>Priority support</li></ul><a class="btn btn-secondary" href="mailto:leadflowautomation.dav@gmail.com?subject=Premium%20Package%20Inquiry">Choose Premium →</a></article>
         </div>
+      </div>
     </section>
 
-    <section id="demo" class="section">
-        <div class="container">
-            <h2>Live Demo</h2>
-            <div class="chat-demo">
-                <div class="chat-header">LeadFlow Assistant</div>
-                <div class="chat-body" id="chatBody">
-                    <div class="message bot-message">Hi! 👋 I’m a demo chatbot. Ask me about your business hours or pricing.</div>
-                </div>
-                <div class="chat-input">
-                    <input type="text" id="chatInput" placeholder="Type a message...">
-                    <button onclick="sendMessage()">Send</button>
-                </div>
-            </div>
-            <p style="text-align: center; margin-top: 20px; color: var(--text-muted);">This is a placeholder demo. A real AI chatbot can be trained on your specific FAQs.</p>
+    <section class="section" id="demo">
+      <div class="container">
+        <div class="demo-wrap card reveal">
+          <div class="demo-info"><div class="kicker">Interactive demo</div><h3>See the experience before you buy.</h3><p>This demo uses predefined responses to show the kind of customer journey a real business chatbot can provide.</p><div class="demo-points"><div><b>✓</b> Answers common questions</div><div><b>✓</b> Guides visitors toward an action</div><div><b>✓</b> Can be customised around your business</div></div></div>
+          <div class="chat"><div class="chat-head"><div class="bot-avatar">LF</div><div><b>LeadFlow Assistant</b><small>Customer support & lead capture</small></div><span class="online">● Online</span></div><div class="chat-body" id="chatBody"><div class="bubble bot">Hi! 👋 I’m the LeadFlow demo assistant. Ask me about pricing, services, delivery, or booking a consultation.</div></div><div class="suggestions"><button class="suggestion" data-q="What are your prices?">Pricing</button><button class="suggestion" data-q="What services do you offer?">Services</button><button class="suggestion" data-q="How long does delivery take?">Delivery</button></div><form class="chat-form" id="chatForm"><input id="chatInput" aria-label="Message" autocomplete="off" placeholder="Type a message..."/><button type="submit">Send</button></form></div>
         </div>
+      </div>
     </section>
 
-    <section id="contact" class="section">
-        <div class="container contact">
-            <h2>Contact</h2>
-            <p>Ready to automate your customer support?<br>
-            Email me at <a href="mailto:leadflowautomation.dav@gmail.com">leadflowautomation.dav@gmail.com</a></p>
-            <a href="mailto:leadflowautomation.dav@gmail.com?subject=AI%20Chatbot%20Project" class="btn" style="margin-top: 20px;">Start a Conversation</a>
+    <section class="section" id="faq">
+      <div class="container">
+        <div class="section-head reveal"><div class="kicker">Questions</div><h2>Good to know.</h2><p>A few answers before we start.</p></div>
+        <div class="faq">
+          <details class="reveal"><summary>What kind of businesses can you help?</summary><p>The systems can be adapted for service businesses, agencies, professional services, local businesses and other teams that receive repeated customer enquiries.</p></details>
+          <details class="reveal"><summary>Will the chatbot sound like my business?</summary><p>Yes. The conversation can be structured around your tone, services, FAQs, policies and the actions you want visitors to take.</p></details>
+          <details class="reveal"><summary>Can you connect the chatbot to my existing tools?</summary><p>Depending on the tools involved, lead information can be routed to email, spreadsheets, CRM systems and other supported workflows.</p></details>
+          <details class="reveal"><summary>Is the demo on this page a real AI assistant?</summary><p>This public demo is intentionally lightweight and uses predefined browser-side responses. Client systems can use a real AI backend and business-specific knowledge.</p></details>
         </div>
+      </div>
     </section>
 
-    <footer>
-        <div class="container">
-            © 2026 Lead Flow Automation. All rights reserved.
-        </div>
-    </footer>
+    <section class="section" id="contact">
+      <div class="container"><div class="contact-box reveal"><div class="kicker">Ready when you are</div><h2>Let's build your first automated lead flow.</h2><p>Tell me what your business does, where customers currently get stuck, and what you want to automate. We’ll start there.</p><a class="contact-email" href="mailto:leadflowautomation.dav@gmail.com">leadflowautomation.dav@gmail.com</a><div class="actions"><a class="btn btn-primary" href="mailto:leadflowautomation.dav@gmail.com?subject=AI%20Automation%20Consultation">Book a free 15-minute consultation ↗</a></div></div></div>
+    </section>
+  </main>
 
-    <script>
-        function sendMessage() {
-            const input = document.getElementById('chatInput');
-            const body = document.getElementById('chatBody');
-            const text = input.value.trim();
-            if (!text) return;
+  <footer><div class="container footer-inner"><span>© 2026 Lead Flow Automation. Built for better customer conversations.</span><div class="footer-links"><a href="#services">Services</a><a href="#pricing">Pricing</a><a href="#contact">Contact</a></div></div></footer>
 
-            // Add user message
-            const userMsg = document.createElement('div');
-            userMsg.className = 'message user-message';
-            userMsg.textContent = text;
-            body.appendChild(userMsg);
+  <script>
+    const nav=document.querySelector('.nav'),menuBtn=document.getElementById('menuBtn');
+    menuBtn.addEventListener('click',()=>nav.classList.toggle('open'));
+    document.querySelectorAll('.nav-links a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));
 
-            // Generate bot response (simple predefined)
-            let reply = "I'm just a demo. For a real AI chatbot, contact David at Lead Flow Automation!";
-            if (text.toLowerCase().includes('price') || text.toLowerCase().includes('cost')) {
-                reply = "Packages start at $750 for a basic chatbot. Email leadflowautomation.dav@gmail.com for a custom quote.";
-            } else if (text.toLowerCase().includes('hour') || text.toLowerCase().includes('open')) {
-                reply = "Our business hours are flexible. Contact us to schedule a consultation.";
-            }
-            const botMsg = document.createElement('div');
-            botMsg.className = 'message bot-message';
-            botMsg.textContent = reply;
-            body.appendChild(botMsg);
+    const observer=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}}),{threshold:.12});
+    document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
 
-            input.value = '';
-            body.scrollTop = body.scrollHeight;
-        }
-        document.getElementById('chatInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendMessage();
-        });
-    </script>
+    const body=document.getElementById('chatBody'),input=document.getElementById('chatInput'),form=document.getElementById('chatForm');
+    function addBubble(text,type){const el=document.createElement('div');el.className='bubble '+type;el.textContent=text;body.appendChild(el);body.scrollTop=body.scrollHeight}
+    function replyFor(text){
+      const t=text.toLowerCase();
+      if(t.includes('price')||t.includes('cost')||t.includes('package')) return 'Packages start at $750. Professional is $1,500 and Premium is $2,500. You can use the contact button to request a consultation.';
+      if(t.includes('service')||t.includes('do you')) return 'I build custom AI chatbots, lead capture systems, CRM/email workflows, and analytics or optimisation systems for growing businesses.';
+      if(t.includes('deliver')||t.includes('how long')||t.includes('time')) return 'The Starter package has a 5-day target delivery. Larger projects depend on scope, integrations and the workflow required.';
+      if(t.includes('book')||t.includes('consult')||t.includes('contact')) return 'Great. Email leadflowautomation.dav@gmail.com with your business name and what you want to automate, and David can take it from there.';
+      if(t.includes('hello')||t.includes('hi')) return 'Hey! 👋 Tell me what your business does or ask me about pricing, services, delivery, or consultations.';
+      return 'I can help with pricing, services, delivery times, or booking a consultation. What would you like to know?';
+    }
+    function send(text){if(!text.trim())return;addBubble(text,'user');input.value='';setTimeout(()=>addBubble(replyFor(text),'bot'),300)}
+    form.addEventListener('submit',e=>{e.preventDefault();send(input.value)});
+    document.querySelectorAll('.suggestion').forEach(btn=>btn.addEventListener('click',()=>send(btn.dataset.q)));
+  </script>
 </body>
 </html>
