@@ -17,7 +17,7 @@ jobs:
           from pathlib import Path
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
-          tag = '<script src="leadflow-qualification.js?v=20260831-4" defer></script>'
+          tag = '<script src="leadflow-qualification.js?v=20260831-5" defer></script>'
           import re
           s = re.sub(r'<script\s+src=["\']leadflow-qualification\.js(?:\?[^"\']*)?["\']\s+defer></script>', '', s)
           if tag not in s:
@@ -27,4 +27,4 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          git diff --cached --quiet || (git commit -m 'Keep consultation script cache-busted and singular' && git push)
+          git diff --cached --quiet || (git commit -m 'Bump consultation script cache version' && git push)
