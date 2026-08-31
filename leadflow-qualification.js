@@ -1,6 +1,6 @@
-/* LeadFlow Assistant — qualification layer (frontend only)
- * No personal data is stored or transmitted by this file.
- * Connect its submitLead() hook to a secure backend when one is available.
+/* LeadFlow Assistant — qualification layer
+ * Sends approved lead data to the secure backend.
+ * No API keys or private credentials belong in this file.
  */
 (() => {
   const state = { step: 0, data: {}, consent: false };
@@ -28,23 +28,46 @@
       c.querySelectorAll('[data-option]').forEach(b => b.addEventListener('click', () => { state.data[s.key] = b.dataset.option; state.step++; render(); }));
       return;
     }
-    c.innerHTML = `<div class="lfq"><h3>You're almost there.</h3><p>Would you like David to follow up about your automation needs?</p><label><input id="lfqConsent" type="checkbox"> I agree that Lead Flow Automation may use my contact information to follow up.</label><div class="lfq-fields"><input id="lfqName" placeholder="Your name"><input id="lfqEmail" type="email" placeholder="Email address"></div><button type="button" id="lfqSubmit">Request consultation</button><p class="lfq-note">Your details should only be sent to a secure backend after consent. This frontend demo does not store them.</p></div>`;
-    c.querySelector('#lfqSubmit').addEventListener('click', () => {
-      const consent = c.querySelector('#lfqConsent').checked;
-      const name = c.querySelector('#lfqName').value.trim();
-      const email = c.querySelector('#lfqEmail').value.trim();
-      if (!consent) return alert('Please give consent before submitting your contact details.');
-      if (!name || !email) return alert('Please enter your name and email.');
-      state.consent = true; state.data.name = name; state.data.email = email; submitLead({ ...state.data, consent: true, consentTimestamp: new Date().toISOString() });
-    });
+    c.innerHTML = `<div class="lfq"><h3>You're almost there.</h3><p>Would you like David to follow up about your automation needs?</p><label><input id="lfqConsent" type="checkbox"> I agree that Lead Flow Automation may use my contact information to follow up.</label><div class="lfq-fields"><input id="lfqName" placeholder="Your name" autocomplete="name"><input id="lfqEmail" type="email" placeholder="Email address" autocomplete="email"></div><button type="button" id="lfqSubmit">Request consultation</button><p class="lfq-note">Your contact information is submitted only after consent.</p><p id="lfqStatus" class="lfq-status" role="status" aria-live="polite"></p></div>`;
+    c.querySelector('#lfqSubmit').addEventListener('click', submitFromForm);
   }
 
-  function submitLead(lead) {
-    // Backend integration point. Do not add API keys or private credentials here.
-    const subject = encodeURIComponent('Lead Flow Automation — Consultation Request');
-    const body = encodeURIComponent(`Name: ${lead.name}\nEmail: ${lead.email}\nBusiness: ${lead.businessType}\nOnline presence: ${lead.onlinePresence}\nAutomation need: ${lead.need}\nPackage interest: ${lead.package}\nStart timeframe: ${lead.timeline}\nConsent: yes`);
-    window.location.href = `mailto:leadflowautomation.dav@gmail.com?subject=${subject}&body=${body}`;
+  async function submitFromForm() {
+    const c = LeadFlowQualification.container;
+    const submit = c.querySelector('#lfqSubmit');
+    const status = c.querySelector('#lfqStatus');
+    const consent = c.querySelector('#lfqConsent').checked;
+    const name = c.querySelector('#lfqName').value.trim();
+    const email = c.querySelector('#lfqEmail').value.trim();
+    if (!consent) return setStatus(status, 'Please give consent before submitting your contact details.');
+    if (!name || !email) return setStatus(status, 'Please enter your name and email.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setStatus(status, 'Please enter a valid email address.');
+
+    state.consent = true;
+    state.data.name = name;
+    state.data.email = email;
+    submit.disabled = true;
+    setStatus(status, 'Submitting your consultation request…');
+
+    try {
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...state.data, consent: true })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Unable to submit your request.');
+      c.innerHTML = `<div class="lfq"><h3>Request received. ✅</h3><p>Thanks, ${escapeHtml(name)}. David will follow up about your automation needs.</p><p class="lfq-note">You can also email leadflowautomation.dav@gmail.com if you need anything immediately.</p></div>`;
+    } catch (error) {
+      submit.disabled = false;
+      setStatus(status, error.message || 'Something went wrong. Please try again.');
+    }
   }
+
+  function setStatus(el, message) {
+    if (el) el.textContent = message;
+  }
+
   const escapeHtml = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const escapeAttr = escapeHtml;
 })();
