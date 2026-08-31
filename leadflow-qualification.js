@@ -135,8 +135,18 @@
     LeadFlowQualification.start(overlay.querySelector('#lfqMount'));
   }
 
+  function loadLiveChat() {
+    if (document.getElementById('leadflow-live-chat')) return;
+    const script = document.createElement('script');
+    script.id = 'leadflow-live-chat';
+    script.src = 'leadflow-chat.js';
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
   function initLauncher() {
     injectStyles();
+    loadLiveChat();
     const chips = document.querySelector('.chips');
     if (chips && !chips.querySelector('[data-lfq-launch]')) {
       const button = document.createElement('button');
@@ -148,8 +158,6 @@
       chips.appendChild(button);
     }
 
-    // Turn the primary hero CTA into a direct conversion action instead of
-    // making a prospect scroll before they can start the qualification flow.
     const heroCta = document.querySelector('.actions .cta[href="#demo"]');
     if (heroCta && !heroCta.dataset.lfqBound) {
       heroCta.dataset.lfqBound = 'true';
