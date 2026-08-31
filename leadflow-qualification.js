@@ -10,7 +10,7 @@
     { key: 'packageInterest', q: 'Which level sounds closest to what you need?', options: ['Starter — $750','Professional — $1,500','Premium — $2,500','Not sure yet'] },
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
-  const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
+  const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflowautomations-github-io.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
   window.LeadFlowQualification = { start(container) { if (!container) return; this.container = container; state.step = 0; state.data = {}; state.consent = false; render(); } };
   function render() {
     const c = LeadFlowQualification.container; if (!c) return;
