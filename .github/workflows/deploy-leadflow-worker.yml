@@ -63,12 +63,12 @@ jobs:
           fi
 
           echo "Resolved leadflow-leads D1 database."
-          node -e '
+          DB_ID="$DB_ID" node -e '
             const fs = require("fs");
             const p = "wrangler.jsonc";
             const s = fs.readFileSync(p, "utf8").replace("REPLACE_AFTER_D1_CREATE", process.env.DB_ID);
             fs.writeFileSync(p, s);
-          ' DB_ID="$DB_ID"
+          '
 
       - name: Apply D1 migrations
         env:
