@@ -32,33 +32,42 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "Missing required Cloudflare GitHub Actions secrets: CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID."
+            exit 1
+          fi
 
-          DB_ID="$(wrangler d1 list --json | node -e '
-            let input = "";
-            process.stdin.on("data", c => input += c);
-            process.stdin.on("end", () => {
-              const rows = JSON.parse(input);
-              const db = rows.find(x => x.name === "leadflow-leads");
-              if (db?.uuid) process.stdout.write(db.uuid);
-            });
-          ')"
+          DB_ID="$(curl -fsS --retry 3 \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database?name=leadflow-leads&per_page=100" \
+            | node -e '
+              let input = "";
+              process.stdin.on("data", c => input += c);
+              process.stdin.on("end", () => {
+                const data = JSON.parse(input);
+                if (!data.success) throw new Error(JSON.stringify(data.errors || data));
+                const db = (data.result || []).find(x => x.name === "leadflow-leads");
+                if (db?.uuid) process.stdout.write(db.uuid);
+              });
+            ')"
 
           if [ -z "$DB_ID" ]; then
             echo "D1 database leadflow-leads was not found; creating it."
-            CREATE_JSON="$(wrangler d1 create leadflow-leads --json)"
+            CREATE_JSON="$(CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}" wrangler d1 create leadflow-leads --json)"
             DB_ID="$(printf '%s' "$CREATE_JSON" | node -e '
               let input = "";
               process.stdin.on("data", c => input += c);
               process.stdin.on("end", () => {
                 const data = JSON.parse(input);
-                const uuid = data.uuid || data.database_id || data.database?.uuid;
+                const uuid = data.uuid || data.database_id || data.database?.uuid || data.result?.uuid;
                 if (uuid) process.stdout.write(uuid);
               });
             ')"
           fi
 
-          if [ -z "$DB_ID" ]; then
-            echo "Unable to resolve the leadflow-leads D1 database ID."
+          if ! printf '%s' "$DB_ID" | grep -Eq '^[0-9a-fA-F-]{36}$'; then
+            echo "Unable to resolve a valid D1 database UUID for leadflow-leads."
             exit 1
           fi
 
@@ -67,6 +76,7 @@ jobs:
             const fs = require("fs");
             const p = "wrangler.jsonc";
             const s = fs.readFileSync(p, "utf8").replace("REPLACE_AFTER_D1_CREATE", process.env.DB_ID);
+            if (s.includes("REPLACE_AFTER_D1_CREATE")) throw new Error("D1 placeholder was not replaced");
             fs.writeFileSync(p, s);
           '
 
