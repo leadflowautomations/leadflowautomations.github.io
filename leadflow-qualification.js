@@ -1,5 +1,6 @@
 /* LeadFlow Assistant — qualification layer
  * Collects approved lead data after consent and sends it to the secure backend.
+ * If the backend is temporarily unreachable, provides a transparent email fallback.
  */
 (() => {
   const state = { step: 0, data: {}, consent: false };
@@ -11,9 +12,9 @@
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
 
-  // Production API is the existing Cloudflare Worker backend.
-  // GitHub Pages must never point at AppDeploy for this flow.
+  // Production API: existing Cloudflare Worker. Never use AppDeploy here.
   const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
+  const FALLBACK_EMAIL = 'leadflowautomation.dav@gmail.com';
 
   window.LeadFlowQualification = {
     start(container) {
@@ -24,9 +25,7 @@
       state.consent = false;
       render();
     },
-    open() {
-      openQualification();
-    }
+    open() { openQualification(); }
   };
 
   function render() {
@@ -60,7 +59,7 @@
 
     if (!consent) return setStatus(status, 'Please give consent before submitting your contact details.');
     if (!businessName || !name || !email) return setStatus(status, 'Please enter your business name, name and email.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setStatus(status, 'Please enter a valid email address.');
+    if (!/^([^\s@]+)@([^\s@]+)\.([^\s@]+)$/.test(email)) return setStatus(status, 'Please enter a valid email address.');
 
     state.consent = true;
     state.data = {
@@ -80,26 +79,43 @@
     try {
       const response = await fetch(`${API_BASE}/api/leads`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(state.data)
       });
 
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || `The consultation service returned an error (${response.status}).`);
-      }
+      if (!response.ok) throw new Error(result.error || `The consultation service returned an error (${response.status}).`);
 
       c.innerHTML = `<div class="lfq"><h3>Request received. ✅</h3><p>Thanks, ${escapeHtml(name)}. David will follow up about your automation needs.</p><p class="lfq-note">Your consultation request has been securely submitted.</p></div>`;
     } catch (error) {
       submit.disabled = false;
       console.error('LeadFlow consultation submission failed:', error);
-      setStatus(status, error instanceof TypeError
-        ? 'We could not reach the consultation service. Please try again in a moment.'
-        : (error.message || 'Something went wrong. Please try again.'));
+      showEmailFallback(c, name, error);
     }
+  }
+
+  function showEmailFallback(c, name, error) {
+    const subject = encodeURIComponent(`Free consultation request — ${state.data.businessName}`);
+    const body = encodeURIComponent([
+      `Hello David,`,
+      '',
+      `I would like a free consultation for my business.`,
+      '',
+      `Business: ${state.data.businessName}`,
+      `Name: ${state.data.name}`,
+      `Email: ${state.data.email}`,
+      `Phone: ${state.data.phone || 'Not provided'}`,
+      `Business type: ${state.data.businessType || 'Not provided'}`,
+      `Online presence: ${state.data.onlinePresence || 'Not provided'}`,
+      `Automation need: ${state.data.need || 'Not provided'}`,
+      `Package interest: ${state.data.packageInterest || 'Not provided'}`,
+      `Timeline: ${state.data.timeline || 'Not provided'}`,
+      '',
+      `Consent: Yes`,
+      `Consent timestamp: ${state.data.consentTimestamp}`
+    ].join('\n'));
+
+    c.innerHTML = `<div class="lfq"><h3>Your request is ready. ✉️</h3><p>Our automatic consultation service is temporarily unavailable. Tap below to open an email with all your answers already filled in. Press <strong>Send</strong> to complete your request.</p><a class="lfq-email-fallback" href="mailto:${FALLBACK_EMAIL}?subject=${subject}&body=${body}">Open email &amp; send request →</a><p class="lfq-note">Nothing is sent until you press Send in your email app.</p></div>`;
   }
 
   function getConversationId() {
@@ -107,9 +123,7 @@
       const key = 'leadflow_conversation_id';
       let id = sessionStorage.getItem(key);
       if (!id) {
-        id = (window.crypto && typeof window.crypto.randomUUID === 'function')
-          ? window.crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        id = (window.crypto && typeof window.crypto.randomUUID === 'function') ? window.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         sessionStorage.setItem(key, id);
       }
       return id;
@@ -118,15 +132,13 @@
     }
   }
 
-  function setStatus(el, message) {
-    if (el) el.textContent = message;
-  }
+  function setStatus(el, message) { if (el) el.textContent = message; }
 
   function injectStyles() {
     if (document.getElementById('lfq-styles')) return;
     const style = document.createElement('style');
     style.id = 'lfq-styles';
-    style.textContent = `.lfq-launch{border:1px solid #5b8cff88!important;background:linear-gradient(135deg,#5b8cff22,#7c5cff22)!important;color:#dce6ff!important}.lfq-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:18px;background:#02050bcc;backdrop-filter:blur(8px)}.lfq-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:linear-gradient(145deg,#111b2b,#0b121f);border:1px solid #33445f;border-radius:22px;box-shadow:0 30px 100px #000b;padding:22px;color:#f5f7fb}.lfq-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.lfq-modal-head b{font-size:1rem}.lfq-close{border:1px solid #33445f;background:#ffffff08;color:#aebbd0;border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:18px}.lfq-progress{color:#91adff;text-transform:uppercase;font-size:.68rem;font-weight:800;letter-spacing:.08em;margin-bottom:8px}.lfq h3{margin:0 0 8px;font-size:1.15rem}.lfq p{color:#9aa7ba;font-size:.84rem;margin:8px 0 16px}.lfq-options{display:grid;gap:9px}.lfq-options button,.lfq #lfqSubmit{border:1px solid #344563;background:#ffffff08;color:#eaf0ff;border-radius:12px;padding:12px;text-align:left;cursor:pointer;font-weight:700}.lfq-options button:hover{border-color:#5b8cff;background:#5b8cff18}.lfq-fields{display:grid;gap:9px}.lfq-fields input{width:100%;box-sizing:border-box;background:#0c1524;border:1px solid #2c3b53;border-radius:10px;padding:12px;color:#fff;outline:none}.lfq-fields input:focus{border-color:#5b8cff}.lfq-consent{display:flex;gap:9px;align-items:flex-start;margin:14px 0;color:#9aa7ba;font-size:.75rem;line-height:1.4}.lfq-consent input{margin-top:3px}.lfq #lfqSubmit{width:100%;text-align:center;background:linear-gradient(135deg,#5b8cff,#7c5cff);border:0;margin-top:4px}.lfq #lfqSubmit:disabled{opacity:.55;cursor:wait}.lfq-note{font-size:.7rem!important;color:#708097!important;text-align:center}.lfq-status{color:#ffb4b4!important;min-height:20px;margin-bottom:0!important}`;
+    style.textContent = `.lfq-launch{border:1px solid #5b8cff88!important;background:linear-gradient(135deg,#5b8cff22,#7c5cff22)!important;color:#dce6ff!important}.lfq-overlay{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:18px;background:#02050bcc;backdrop-filter:blur(8px)}.lfq-modal{width:min(560px,100%);max-height:90vh;overflow:auto;background:linear-gradient(145deg,#111b2b,#0b121f);border:1px solid #33445f;border-radius:22px;box-shadow:0 30px 100px #000b;padding:22px;color:#f5f7fb}.lfq-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.lfq-modal-head b{font-size:1rem}.lfq-close{border:1px solid #33445f;background:#ffffff08;color:#aebbd0;border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:18px}.lfq-progress{color:#91adff;text-transform:uppercase;font-size:.68rem;font-weight:800;letter-spacing:.08em;margin-bottom:8px}.lfq h3{margin:0 0 8px;font-size:1.15rem}.lfq p{color:#9aa7ba;font-size:.84rem;margin:8px 0 16px}.lfq-options{display:grid;gap:9px}.lfq-options button,.lfq #lfqSubmit,.lfq-email-fallback{border:1px solid #344563;background:#ffffff08;color:#eaf0ff;border-radius:12px;padding:12px;text-align:left;cursor:pointer;font-weight:700}.lfq-options button:hover{border-color:#5b8cff;background:#5b8cff18}.lfq-fields{display:grid;gap:9px}.lfq-fields input{width:100%;box-sizing:border-box;background:#0c1524;border:1px solid #2c3b53;border-radius:10px;padding:12px;color:#fff;outline:none}.lfq-fields input:focus{border-color:#5b8cff}.lfq-consent{display:flex;gap:9px;align-items:flex-start;margin:14px 0;color:#9aa7ba;font-size:.75rem;line-height:1.4}.lfq-consent input{margin-top:3px}.lfq #lfqSubmit{width:100%;text-align:center;background:linear-gradient(135deg,#5b8cff,#7c5cff);border:0;margin-top:4px}.lfq #lfqSubmit:disabled{opacity:.55;cursor:wait}.lfq-email-fallback{display:block;width:100%;box-sizing:border-box;text-align:center;background:linear-gradient(135deg,#5b8cff,#7c5cff);border:0;text-decoration:none;margin-top:14px}.lfq-note{font-size:.7rem!important;color:#708097!important;text-align:center}.lfq-status{color:#ffb4b4!important;min-height:20px;margin-bottom:0!important}`;
     document.head.appendChild(style);
   }
 
@@ -147,7 +159,7 @@
     if (document.getElementById('leadflow-live-chat')) return;
     const script = document.createElement('script');
     script.id = 'leadflow-live-chat';
-    script.src = 'leadflow-chat.js?v=20260831-2';
+    script.src = 'leadflow-chat.js?v=20260831-3';
     script.async = true;
     document.head.appendChild(script);
   }
@@ -155,17 +167,12 @@
   function bindLaunchButton(button) {
     if (!button || button.dataset.lfqBound === 'true') return;
     button.dataset.lfqBound = 'true';
-    button.addEventListener('click', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      openQualification();
-    }, true);
+    button.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); openQualification(); }, true);
   }
 
   function initLauncher() {
     injectStyles();
     loadLiveChat();
-
     const chips = document.querySelector('.chips');
     if (chips && !chips.querySelector('[data-lfq-launch]')) {
       const button = document.createElement('button');
@@ -175,22 +182,15 @@
       button.textContent = 'Get a free consultation →';
       chips.appendChild(button);
     }
-
     document.querySelectorAll('.actions .cta, [data-lfq-launch]').forEach(bindLaunchButton);
-
     if (!document.documentElement.dataset.lfqDelegated) {
       document.documentElement.dataset.lfqDelegated = 'true';
       document.addEventListener('click', event => {
-        const target = event.target instanceof Element
-          ? event.target.closest('.actions .cta, [data-lfq-launch]')
-          : null;
+        const target = event.target instanceof Element ? event.target.closest('.actions .cta, [data-lfq-launch]') : null;
         if (!target) return;
-        event.preventDefault();
-        event.stopPropagation();
-        openQualification();
+        event.preventDefault(); event.stopPropagation(); openQualification();
       }, true);
     }
-
     const heroCta = document.querySelector('.actions .cta');
     if (heroCta) {
       heroCta.href = '#';
@@ -201,7 +201,6 @@
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLauncher); else initLauncher();
-
   const escapeHtml = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const escapeAttr = escapeHtml;
 })();
