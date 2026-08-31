@@ -11,7 +11,7 @@
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
 
-  const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
+  const API_BASE = (window.LEADFLOW_API_BASE || 'https://lead-flow-automation-ql6ee5.v2.appdeploy.ai').replace(/\/$/, '');
 
   window.LeadFlowQualification = {
     start(container) {
@@ -174,11 +174,8 @@
       chips.appendChild(button);
     }
 
-    // Bind the main hero CTA directly. This is deliberately independent of
-    // its href so another script cannot turn the button back into a #demo link.
     document.querySelectorAll('.actions .cta, [data-lfq-launch]').forEach(bindLaunchButton);
 
-    // Also watch for buttons re-created by other UI scripts.
     if (!document.documentElement.dataset.lfqDelegated) {
       document.documentElement.dataset.lfqDelegated = 'true';
       document.addEventListener('click', event => {
