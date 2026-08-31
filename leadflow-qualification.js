@@ -21,6 +21,9 @@
       state.data = {};
       state.consent = false;
       render();
+    },
+    open() {
+      openQualification();
     }
   };
 
@@ -142,9 +145,19 @@
     if (document.getElementById('leadflow-live-chat')) return;
     const script = document.createElement('script');
     script.id = 'leadflow-live-chat';
-    script.src = 'leadflow-chat.js?v=20260831';
-    script.defer = true;
+    script.src = 'leadflow-chat.js?v=20260831-2';
+    script.async = true;
     document.head.appendChild(script);
+  }
+
+  function bindLaunchButton(button) {
+    if (!button || button.dataset.lfqBound === 'true') return;
+    button.dataset.lfqBound = 'true';
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      openQualification();
+    }, true);
   }
 
   function initLauncher() {
@@ -161,12 +174,17 @@
       chips.appendChild(button);
     }
 
-    // Use event delegation so the CTA works even if another script replaces
-    // or re-renders the button after this file loads.
+    // Bind the main hero CTA directly. This is deliberately independent of
+    // its href so another script cannot turn the button back into a #demo link.
+    document.querySelectorAll('.actions .cta, [data-lfq-launch]').forEach(bindLaunchButton);
+
+    // Also watch for buttons re-created by other UI scripts.
     if (!document.documentElement.dataset.lfqDelegated) {
       document.documentElement.dataset.lfqDelegated = 'true';
       document.addEventListener('click', event => {
-        const target = event.target.closest('[data-lfq-launch], .actions .cta[href="#demo"]');
+        const target = event.target instanceof Element
+          ? event.target.closest('.actions .cta, [data-lfq-launch]')
+          : null;
         if (!target) return;
         event.preventDefault();
         event.stopPropagation();
@@ -174,7 +192,7 @@
       }, true);
     }
 
-    const heroCta = document.querySelector('.actions .cta[href="#demo"]');
+    const heroCta = document.querySelector('.actions .cta');
     if (heroCta) {
       heroCta.href = '#';
       heroCta.textContent = 'Get a Free Consultation →';
@@ -184,6 +202,7 @@
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLauncher); else initLauncher();
+
   const escapeHtml = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const escapeAttr = escapeHtml;
 })();
