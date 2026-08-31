@@ -1,4 +1,5 @@
 const ALLOWED_ORIGINS = new Set([
+  'https://leadflowautomations-github-io.leadflowautomations-dav.workers.dev',
   'https://leadflowautomations-github-io.pages.dev',
   'https://leadflowautomations.github.io',
 ]);
@@ -23,7 +24,7 @@ Never invent prices, timelines, capabilities, policies or integrations. If uncer
 `;
 
 const cors = (origin) => {
-  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://leadflowautomations-github-io.pages.dev';
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://leadflowautomations-github-io.leadflowautomations-dav.workers.dev';
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
@@ -33,7 +34,7 @@ const cors = (origin) => {
   };
 };
 
-function json(data, status = 200, origin = 'https://leadflowautomations-github-io.pages.dev') {
+function json(data, status = 200, origin = 'https://leadflowautomations-github-io.leadflowautomations-dav.workers.dev') {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', ...cors(origin) },
@@ -147,7 +148,7 @@ async function handoff(request, env, origin) {
 
 export default {
   async fetch(request, env) {
-    const origin = request.headers.get('Origin') || 'https://leadflowautomations-github-io.pages.dev';
+    const origin = request.headers.get('Origin') || 'https://leadflowautomations-github-io.leadflowautomations-dav.workers.dev';
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
 
     const url = new URL(request.url);
