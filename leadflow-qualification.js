@@ -11,7 +11,9 @@
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
 
-  const API_BASE = (window.LEADFLOW_API_BASE || 'https://lead-flow-automation-ql6ee5.v2.appdeploy.ai').replace(/\/$/, '');
+  // Production API is the existing Cloudflare Worker backend.
+  // GitHub Pages must never point at AppDeploy for this flow.
+  const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
 
   window.LeadFlowQualification = {
     start(container) {
