@@ -102,7 +102,9 @@
       const key = 'leadflow_conversation_id';
       let id = sessionStorage.getItem(key);
       if (!id) {
-        id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        id = (window.crypto && typeof window.crypto.randomUUID === 'function')
+          ? window.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         sessionStorage.setItem(key, id);
       }
       return id;
@@ -124,6 +126,7 @@
   }
 
   function openQualification() {
+    if (document.querySelector('.lfq-overlay')) return;
     injectStyles();
     const overlay = document.createElement('div');
     overlay.className = 'lfq-overlay';
@@ -139,7 +142,7 @@
     if (document.getElementById('leadflow-live-chat')) return;
     const script = document.createElement('script');
     script.id = 'leadflow-live-chat';
-    script.src = 'leadflow-chat.js';
+    script.src = 'leadflow-chat.js?v=20260831';
     script.defer = true;
     document.head.appendChild(script);
   }
@@ -147,6 +150,7 @@
   function initLauncher() {
     injectStyles();
     loadLiveChat();
+
     const chips = document.querySelector('.chips');
     if (chips && !chips.querySelector('[data-lfq-launch]')) {
       const button = document.createElement('button');
@@ -154,19 +158,28 @@
       button.className = 'chip lfq-launch';
       button.dataset.lfqLaunch = 'true';
       button.textContent = 'Get a free consultation →';
-      button.addEventListener('click', openQualification);
       chips.appendChild(button);
     }
 
+    // Use event delegation so the CTA works even if another script replaces
+    // or re-renders the button after this file loads.
+    if (!document.documentElement.dataset.lfqDelegated) {
+      document.documentElement.dataset.lfqDelegated = 'true';
+      document.addEventListener('click', event => {
+        const target = event.target.closest('[data-lfq-launch], .actions .cta[href="#demo"]');
+        if (!target) return;
+        event.preventDefault();
+        event.stopPropagation();
+        openQualification();
+      }, true);
+    }
+
     const heroCta = document.querySelector('.actions .cta[href="#demo"]');
-    if (heroCta && !heroCta.dataset.lfqBound) {
-      heroCta.dataset.lfqBound = 'true';
+    if (heroCta) {
       heroCta.href = '#';
       heroCta.textContent = 'Get a Free Consultation →';
-      heroCta.addEventListener('click', event => {
-        event.preventDefault();
-        openQualification();
-      });
+      heroCta.setAttribute('aria-label', 'Get a Free Consultation');
+      heroCta.dataset.lfqBound = 'true';
     }
   }
 
