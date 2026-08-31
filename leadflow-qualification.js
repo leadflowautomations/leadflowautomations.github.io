@@ -11,9 +11,6 @@
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
 
-  // The public website Worker and the API Worker are separate deployments.
-  // Keep this overrideable for future environments, but default to the actual
-  // LeadFlow backend Worker instead of the static-site Worker.
   const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
 
   window.LeadFlowQualification = {
@@ -141,14 +138,28 @@
   function initLauncher() {
     injectStyles();
     const chips = document.querySelector('.chips');
-    if (!chips || chips.querySelector('[data-lfq-launch]')) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'chip lfq-launch';
-    button.dataset.lfqLaunch = 'true';
-    button.textContent = 'Get a free consultation →';
-    button.addEventListener('click', openQualification);
-    chips.appendChild(button);
+    if (chips && !chips.querySelector('[data-lfq-launch]')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'chip lfq-launch';
+      button.dataset.lfqLaunch = 'true';
+      button.textContent = 'Get a free consultation →';
+      button.addEventListener('click', openQualification);
+      chips.appendChild(button);
+    }
+
+    // Turn the primary hero CTA into a direct conversion action instead of
+    // making a prospect scroll before they can start the qualification flow.
+    const heroCta = document.querySelector('.actions .cta[href="#demo"]');
+    if (heroCta && !heroCta.dataset.lfqBound) {
+      heroCta.dataset.lfqBound = 'true';
+      heroCta.href = '#';
+      heroCta.textContent = 'Get a Free Consultation →';
+      heroCta.addEventListener('click', event => {
+        event.preventDefault();
+        openQualification();
+      });
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLauncher); else initLauncher();
