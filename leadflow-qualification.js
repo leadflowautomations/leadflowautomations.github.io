@@ -12,7 +12,9 @@
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
 
-  const API_BASE = (window.LEADFLOW_API_BASE || '').replace(/\/$/, '');
+  // Production API is the separately deployed Cloudflare Worker.
+  // A window override is supported so a custom API hostname can be added later.
+  const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
 
   window.LeadFlowQualification = {
     start(container) {
