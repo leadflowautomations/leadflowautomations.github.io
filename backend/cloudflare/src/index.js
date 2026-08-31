@@ -1,4 +1,7 @@
-const ALLOWED_ORIGIN = 'https://leadflowautomations.github.io';
+const ALLOWED_ORIGINS = new Set([
+  'https://leadflowautomations-github-io.pages.dev',
+  'https://leadflowautomations.github.io',
+]);
 const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 const BUSINESS_SPEC = `
@@ -19,14 +22,18 @@ Contact: leadflowautomation.dav@gmail.com.
 Never invent prices, timelines, capabilities, policies or integrations. If uncertain, say you need David to confirm.
 `;
 
-const cors = (origin) => ({
-  'Access-Control-Allow-Origin': origin === ALLOWED_ORIGIN ? ALLOWED_ORIGIN : ALLOWED_ORIGIN,
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-});
+const cors = (origin) => {
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'https://leadflowautomations-github-io.pages.dev';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  };
+};
 
-function json(data, status = 200, origin = ALLOWED_ORIGIN) {
+function json(data, status = 200, origin = 'https://leadflowautomations-github-io.pages.dev') {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', ...cors(origin) },
@@ -140,7 +147,7 @@ async function handoff(request, env, origin) {
 
 export default {
   async fetch(request, env) {
-    const origin = request.headers.get('Origin') || ALLOWED_ORIGIN;
+    const origin = request.headers.get('Origin') || 'https://leadflowautomations-github-io.pages.dev';
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
 
     const url = new URL(request.url);
