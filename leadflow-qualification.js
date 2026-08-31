@@ -1,7 +1,8 @@
 /* LeadFlow Assistant — qualification layer
- * Uses the Cloudflare Worker when available.
- * If the backend is unavailable, never strands the visitor: it creates a
- * ready-to-send email containing the approved consultation details.
+ * Primary: Cloudflare Worker.
+ * Secondary: FormSubmit AJAX email delivery, so the consultation still works
+ * even if the Worker is temporarily unavailable.
+ * Final emergency fallback: mailto.
  */
 (() => {
   const state = { step: 0, data: {}, consent: false };
@@ -14,6 +15,7 @@
   ];
 
   const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
+  const FORM_SUBMIT_ENDPOINT = 'https://formsubmit.co/ajax/leadflowautomation.dav@gmail.com';
   const FALLBACK_EMAIL = 'leadflowautomation.dav@gmail.com';
 
   window.LeadFlowQualification = {
@@ -82,39 +84,68 @@
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(state.data)
       });
-
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || `The consultation service returned an error (${response.status}).`);
-
-      c.innerHTML = `<div class="lfq lfq-success"><h3>Request received. ✅</h3><p>Thanks, ${escapeHtml(name)}. David will follow up about your automation needs.</p><p class="lfq-note">Your consultation request has been securely submitted.</p></div>`;
+      if (response.ok) {
+        showSuccess(c, name, 'securely submitted');
+        return;
+      }
+      console.warn('LeadFlow Worker unavailable:', result.error || response.status);
     } catch (error) {
-      console.error('LeadFlow consultation submission failed:', error);
+      console.warn('LeadFlow Worker unavailable; using email delivery:', error);
+    }
+
+    try {
+      const mailResult = await fetch(FORM_SUBMIT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          _subject: `New LeadFlow consultation request — ${businessName}`,
+          _template: 'table',
+          _captcha: 'false',
+          _honey: '',
+          _url: window.location.href,
+          name,
+          email,
+          phone: phone || 'Not provided',
+          business: businessName,
+          businessType: state.data.businessType || 'Not provided',
+          onlinePresence: state.data.onlinePresence || 'Not provided',
+          automationNeed: state.data.need || 'Not provided',
+          packageInterest: state.data.packageInterest || 'Not provided',
+          timeline: state.data.timeline || 'Not provided',
+          consent: 'Yes',
+          consentTimestamp: state.data.consentTimestamp,
+          conversationId: state.data.conversationId
+        })
+      });
+      const mailJson = await mailResult.json().catch(() => ({}));
+      if (mailResult.ok && (mailJson.success === true || mailJson.success === 'true')) {
+        showSuccess(c, name, 'sent to David');
+        return;
+      }
+      throw new Error(mailJson.message || `Email delivery returned ${mailResult.status}`);
+    } catch (error) {
+      console.error('LeadFlow consultation email delivery failed:', error);
+      submit.disabled = false;
       showEmailFallback(c, name);
     }
+  }
+
+  function showSuccess(c, name, deliveryText) {
+    c.innerHTML = `<div class="lfq lfq-success"><h3>Request received. ✅</h3><p>Thanks, ${escapeHtml(name)}. Your consultation request was ${escapeHtml(deliveryText)}. David will follow up about your automation needs.</p><p class="lfq-note">You can close this window now.</p></div>`;
   }
 
   function showEmailFallback(c, name) {
     const subject = encodeURIComponent(`Free consultation request — ${state.data.businessName}`);
     const body = encodeURIComponent([
-      `Hello David,`,
-      '',
-      `I would like a free consultation for my business.`,
-      '',
-      `Business: ${state.data.businessName}`,
-      `Name: ${state.data.name}`,
-      `Email: ${state.data.email}`,
-      `Phone: ${state.data.phone || 'Not provided'}`,
-      `Business type: ${state.data.businessType || 'Not provided'}`,
-      `Online presence: ${state.data.onlinePresence || 'Not provided'}`,
-      `Automation need: ${state.data.need || 'Not provided'}`,
-      `Package interest: ${state.data.packageInterest || 'Not provided'}`,
-      `Timeline: ${state.data.timeline || 'Not provided'}`,
-      '',
-      `Consent: Yes`,
-      `Consent timestamp: ${state.data.consentTimestamp}`
+      `Hello David,`, '', `I would like a free consultation for my business.`, '',
+      `Business: ${state.data.businessName}`, `Name: ${state.data.name}`, `Email: ${state.data.email}`,
+      `Phone: ${state.data.phone || 'Not provided'}`, `Business type: ${state.data.businessType || 'Not provided'}`,
+      `Online presence: ${state.data.onlinePresence || 'Not provided'}`, `Automation need: ${state.data.need || 'Not provided'}`,
+      `Package interest: ${state.data.packageInterest || 'Not provided'}`, `Timeline: ${state.data.timeline || 'Not provided'}`,
+      '', `Consent: Yes`, `Consent timestamp: ${state.data.consentTimestamp}`
     ].join('\n'));
-
-    c.innerHTML = `<div class="lfq"><h3>Your consultation is ready. ✉️</h3><p>The automatic service is temporarily unavailable, so I prepared the request for you instead. Tap the button below, then press <strong>Send</strong> in your email app.</p><a class="lfq-email-fallback" href="mailto:${FALLBACK_EMAIL}?subject=${subject}&body=${body}">Open email &amp; send request →</a><p class="lfq-note">Nothing is sent until you press Send.</p></div>`;
+    c.innerHTML = `<div class="lfq"><h3>Your consultation is ready. ✉️</h3><p>The automatic delivery services are unavailable right now, so I prepared the request for you instead. Tap below and press <strong>Send</strong> in your email app.</p><a class="lfq-email-fallback" href="mailto:${FALLBACK_EMAIL}?subject=${subject}&body=${body}">Open email &amp; send request →</a><p class="lfq-note">Nothing is sent until you press Send.</p></div>`;
   }
 
   function getConversationId() {
@@ -126,9 +157,7 @@
         sessionStorage.setItem(key, id);
       }
       return id;
-    } catch {
-      return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
+    } catch { return `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
   }
 
   function setStatus(el, message) { if (el) el.textContent = message; }
@@ -175,11 +204,7 @@
     const chips = document.querySelector('.chips');
     if (chips && !chips.querySelector('[data-lfq-launch]')) {
       const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'chip lfq-launch';
-      button.dataset.lfqLaunch = 'true';
-      button.textContent = 'Get a free consultation →';
-      chips.appendChild(button);
+      button.type = 'button'; button.className = 'chip lfq-launch'; button.dataset.lfqLaunch = 'true'; button.textContent = 'Get a free consultation →'; chips.appendChild(button);
     }
     document.querySelectorAll('.actions .cta, [data-lfq-launch]').forEach(bindLaunchButton);
     if (!document.documentElement.dataset.lfqDelegated) {
@@ -191,12 +216,7 @@
       }, true);
     }
     const heroCta = document.querySelector('.actions .cta');
-    if (heroCta) {
-      heroCta.href = '#';
-      heroCta.textContent = 'Get a Free Consultation →';
-      heroCta.setAttribute('aria-label', 'Get a Free Consultation');
-      heroCta.dataset.lfqBound = 'true';
-    }
+    if (heroCta) { heroCta.href = '#'; heroCta.textContent = 'Get a Free Consultation →'; heroCta.setAttribute('aria-label', 'Get a Free Consultation'); heroCta.dataset.lfqBound = 'true'; }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initLauncher); else initLauncher();
