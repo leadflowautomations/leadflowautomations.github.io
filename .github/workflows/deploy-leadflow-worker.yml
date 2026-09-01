@@ -82,6 +82,22 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: wrangler d1 migrations apply leadflow-leads --remote
 
+      - name: Configure Resend email secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RESEND_API_KEY:-}" ] || [ -z "${FROM_EMAIL:-}" ]; then
+            echo "Missing GitHub Actions secrets RESEND_API_KEY and/or FROM_EMAIL."
+            exit 1
+          fi
+          printf '%s' "$RESEND_API_KEY" | wrangler secret put RESEND_API_KEY
+          printf '%s' "$FROM_EMAIL" | wrangler secret put FROM_EMAIL
+          echo "Resend Worker secrets configured."
+
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
