@@ -17,7 +17,7 @@ jobs:
           from pathlib import Path
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
-          tag = '<script src="leadflow-qualification.js?v=20260831-5" defer></script>'
+          tag = '<script src="leadflow-qualification.js?v=20260901-1" defer></script>'
           import re
           s = re.sub(r'<script\s+src=["\']leadflow-qualification\.js(?:\?[^"\']*)?["\']\s+defer></script>', '', s)
           if tag not in s:
