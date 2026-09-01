@@ -9,7 +9,6 @@
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
   const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
-  const FORM_SUBMIT_AJAX = 'https://formsubmit.co/ajax/leadflowautomation.dav@gmail.com';
   const FALLBACK_EMAIL = 'leadflowautomation.dav@gmail.com';
 
   window.LeadFlowQualification = {
@@ -48,32 +47,11 @@
       const response = await fetch(`${API_BASE}/api/leads`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(state.data) });
       const result = await response.json().catch(() => ({}));
       if (response.ok) { showSuccess(c, name); return; }
-      console.warn('LeadFlow Worker unavailable:', result.error || response.status);
-    } catch (error) { console.warn('LeadFlow Worker unavailable:', error); }
-
-    try {
-      const payload = {
-        _subject: `New LeadFlow consultation request — ${businessName}`,
-        _template: 'table',
-        _captcha: 'true',
-        _replyto: email,
-        _url: window.location.href,
-        name, email, phone: phone || 'Not provided', business: businessName,
-        businessType: state.data.businessType || 'Not provided',
-        onlinePresence: state.data.onlinePresence || 'Not provided',
-        automationNeed: state.data.need || 'Not provided',
-        packageInterest: state.data.packageInterest || 'Not provided',
-        timeline: state.data.timeline || 'Not provided', consent: 'Yes',
-        consentTimestamp: state.data.consentTimestamp, conversationId: state.data.conversationId
-      };
-      const response = await fetch(FORM_SUBMIT_AJAX, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(payload) });
-      const result = await response.json().catch(() => ({}));
-      console.log('FormSubmit response:', result);
-      if (response.ok && (result.success === true || result.success === 'true')) { showFormSubmitAccepted(c, name); return; }
-      showDeliveryError(c, result.message || `Email delivery returned HTTP ${response.status}.`);
+      console.warn('LeadFlow Worker delivery failed:', result.error || response.status);
+      showDeliveryError(c, result.error || `The delivery service returned HTTP ${response.status}. Your details were stored, but the email could not be confirmed.`);
     } catch (error) {
-      console.error('FormSubmit delivery failed:', error);
-      showDeliveryError(c, 'We could not get a confirmed response from the email delivery service.');
+      console.error('LeadFlow Worker request failed:', error);
+      showDeliveryError(c, 'The delivery service could not be reached. Your details may still be stored; please use the email backup below.');
     } finally { submit.disabled = false; }
   }
 
@@ -81,15 +59,11 @@
     c.innerHTML = `<div class="lfq lfq-success"><h3>Consultation request received. ✅</h3><p>Thanks, ${escapeHtml(name)}. Your request was accepted by the LeadFlow delivery service. David will follow up.</p><p class="lfq-note">You can close this window now.</p><button type="button" class="lfq-close-result" onclick="this.closest('.lfq-overlay')?.remove()">Done</button></div>`;
   }
 
-  function showFormSubmitAccepted(c, name) {
-    c.innerHTML = `<div class="lfq lfq-success"><h3>Consultation request received. ✅</h3><p>Thanks, ${escapeHtml(name)}. FormSubmit accepted your request for delivery to the Lead Flow Automation business inbox.</p><p class="lfq-note">If this is the first FormSubmit submission, you may need to confirm the activation email before delivery begins. If you don't receive that activation email, check Spam/Junk and All Mail.</p><button type="button" class="lfq-close-result" onclick="this.closest('.lfq-overlay')?.remove()">Done</button></div>`;
-  }
-
   function showDeliveryError(c, message) {
     const safe = escapeHtml(message);
     const subject = encodeURIComponent(`Free consultation request — ${state.data.businessName}`);
     const body = encodeURIComponent(['Hello David,', '', 'I would like a free consultation for my business.', '', `Business: ${state.data.businessName}`, `Name: ${state.data.name}`, `Email: ${state.data.email}`, `Phone: ${state.data.phone || 'Not provided'}`, `Business type: ${state.data.businessType || 'Not provided'}`, `Online presence: ${state.data.onlinePresence || 'Not provided'}`, `Automation need: ${state.data.need || 'Not provided'}`, `Package interest: ${state.data.packageInterest || 'Not provided'}`, `Timeline: ${state.data.timeline || 'Not provided'}`, '', 'Consent: Yes', `Consent timestamp: ${state.data.consentTimestamp}`].join('\n'));
-    c.innerHTML = `<div class="lfq"><h3>Delivery needs attention.</h3><p>${safe}</p><p class="lfq-note">The website will not falsely tell the customer that an email was delivered. The lead details are still available in this form.</p><a class="lfq-email-fallback" href="mailto:${FALLBACK_EMAIL}?subject=${subject}&body=${body}">Open email backup →</a><p class="lfq-note">Nothing is sent until you press Send.</p></div>`;
+    c.innerHTML = `<div class="lfq"><h3>Delivery needs attention.</h3><p>${safe}</p><p class="lfq-note">Your lead details remain available in this form. We will not falsely report that an email was delivered.</p><a class="lfq-email-fallback" href="mailto:${FALLBACK_EMAIL}?subject=${subject}&body=${body}">Open email backup →</a><p class="lfq-note">Nothing is sent until you press Send.</p></div>`;
   }
 
   function getConversationId() {
