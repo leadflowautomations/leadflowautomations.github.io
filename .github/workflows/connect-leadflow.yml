@@ -20,6 +20,7 @@ jobs:
           tag = '<script src="leadflow-qualification.js?v=20260901-1" defer></script>'
           import re
           s = re.sub(r'<script\s+src=["\']leadflow-qualification\.js(?:\?[^"\']*)?["\']\s+defer></script>', '', s)
+          s = s.replace('leadflowautomation.dav@gmail.com', 'leadflowautomations.dav@gmail.com')
           if tag not in s:
               s = s.replace('</head>', f'{tag}</head>', 1)
           p.write_text(s, encoding='utf-8')
