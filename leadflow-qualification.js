@@ -9,7 +9,7 @@
     { key: 'timeline', q: 'When would you ideally like to start?', options: ['Within 2–4 weeks','Later','Just exploring'] }
   ];
   const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
-  const FALLBACK_EMAIL = 'leadflowautomation.dav@gmail.com';
+  const FALLBACK_EMAIL = 'leadflowautomations.dav@gmail.com';
 
   window.LeadFlowQualification = {
     start(container) { if (!container) return; this.container = container; state.step = 0; state.data = {}; state.consent = false; render(); },
