@@ -8,8 +8,14 @@
   let busy = false;
   let waitingForEmail = false;
 
+  const davidQuickAnswers = [
+    [/^who is david[?!.]*$/i, 'David Elijah is the founder and lead automation specialist behind Lead Flow Automation. He helps small businesses build AI-powered chatbots and automation systems for lead capture, customer support and follow-up.'],
+    [/^what does david do[?!.]*$/i, 'David Elijah is the founder and lead automation specialist behind Lead Flow Automation. He designs and implements AI-powered chatbots and automation systems for small businesses.'],
+    [/^(who founded lead flow automation|who is the founder of lead flow automation)[?!.]*$/i, 'Lead Flow Automation was founded and is led by David Elijah, a lead automation specialist focused on AI-powered systems for small businesses.']
+  ];
+
   const fallback = [
-    [/who is david|who.*david|what does david do|what.*david.*do|founder.*david/i, 'David Elijah is the founder and lead automation specialist behind Lead Flow Automation. He works with small businesses to design and implement AI-powered chatbots, lead-capture systems, customer-support automation and follow-up workflows. If you would like to speak with David about your business, you can schedule a 15-minute consultation using the button at the top of the page.'],
+    [/who is david|who.*david|what does david do|what.*david.*do|founder.*david/i, 'David Elijah is the founder and lead automation specialist behind Lead Flow Automation. He helps small businesses build AI-powered chatbots and automation systems for lead capture, customer support and follow-up.'],
     [/can i speak to david|talk to david|speak with david|contact david/i, 'Absolutely. David Elijah is the founder and lead automation specialist at Lead Flow Automation. If you would like to discuss your business with him directly, you can schedule a 15-minute consultation using the button at the top of the page.'],
     [/price|cost|expensive|pricing|how much|budget/i, 'Absolutely. Lead Flow Automation currently has three packages: Starter at $750, Professional at $1,500, and Premium at $2,500. If you tell me what you want to automate, I can help you figure out which level makes sense rather than pushing you toward the most expensive option.'],
     [/how long|timeline|days|delivery|deliver|when.*ready/i, 'Typical delivery is 5 business days for Starter, 7 for Professional, and 10 for Premium. The exact timeline depends on the scope and integrations you need.'],
@@ -71,6 +77,16 @@
       handleEmail(body, input, text);
       input.focus();
       return;
+    }
+
+    for (const [pattern, answer] of davidQuickAnswers) {
+      if (pattern.test(text)) {
+        add(body, answer, 'bot');
+        history.push({ role: 'user', content: text }, { role: 'assistant', content: answer });
+        history = history.slice(-16);
+        input.focus();
+        return;
+      }
     }
 
     busy = true;
