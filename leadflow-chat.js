@@ -1,19 +1,12 @@
-/* LeadFlow Assistant — live AI chat layer
- * Uses the production Cloudflare Worker AI endpoint and keeps a local
- * fallback so the demo remains usable if the AI service is temporarily down.
- */
+/* LeadFlow Assistant — live AI chat layer */
 (() => {
   const API_BASE = (window.LEADFLOW_API_BASE || 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/, '');
-  let history = [];
-  let busy = false;
-  let waitingForEmail = false;
-
+  let history = [], busy = false, waitingForEmail = false;
   const davidQuickAnswers = [
     [/^who is david[?!.]*$/i, 'David Elijah is the founder and lead automation specialist behind Lead Flow Automation. He helps small businesses build AI-powered chatbots and automation systems for lead capture, customer support and follow-up.'],
     [/^what does david do[?!.]*$/i, 'David Elijah is the founder and lead automation specialist behind Lead Flow Automation. He designs and implements AI-powered chatbots and automation systems for small businesses.'],
     [/^(who founded lead flow automation|who is the founder of lead flow automation)[?!.]*$/i, 'Lead Flow Automation was founded and is led by David Elijah, a lead automation specialist focused on AI-powered systems for small businesses.']
   ];
-
   const fallback = [
     [/who is david|who.*david|what does david do|what.*david.*do|founder.*david/i, 'David Elijah is the founder and lead automation specialist behind Lead Flow Automation. He helps small businesses build AI-powered chatbots and automation systems for lead capture, customer support and follow-up.'],
     [/can i speak to david|talk to david|speak with david|contact david/i, 'Absolutely. David Elijah is the founder and lead automation specialist at Lead Flow Automation. If you would like to discuss your business with him directly, you can schedule a 15-minute consultation using the button at the top of the page.'],
@@ -33,211 +26,13 @@
     [/restaurant|salon|real estate|agency|clinic|shop|business/i, 'Yes — the system can be tailored to different small-business workflows. The useful next question is what your customers usually ask and what you currently do when someone becomes interested.'],
     [/help|start|begin|interested|need.*chatbot|want.*chatbot/i, 'Great. The easiest place to start is with your goal: tell me what kind of business you run, what you want the assistant to handle, and where your customers currently contact you. I can help you think through the right setup.']
   ];
-
-  function replyFallback(text) {
-    for (const [pattern, answer] of fallback) if (pattern.test(text)) return answer;
-    waitingForEmail = true;
-    return 'That sounds like something worth looking at specifically. I can have David get back to you about it. What’s the best email address to reach you?';
-  }
-
-  function add(body, text, cls) {
-    const d = document.createElement('div');
-    d.className = `bubble ${cls}`;
-    d.textContent = text;
-    body.appendChild(d);
-    body.scrollTop = body.scrollHeight;
-    return d;
-  }
-
-  function isEmail(text) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(text || '').trim());
-  }
-
-  function handleEmail(body, input, text) {
-    const email = String(text || '').trim();
-    if (!isEmail(email)) {
-      add(body, 'Please enter a valid email address so David knows where to reach you.', 'bot');
-      return true;
-    }
-    waitingForEmail = false;
-    try { sessionStorage.setItem('leadflow_callback_email', email); } catch (_) {}
-    add(body, `Thanks — I’ve noted ${email} for this conversation. David can follow up about your request.`, 'bot');
-    history.push({ role: 'user', content: email }, { role: 'assistant', content: `Thanks — I’ve noted ${email} for this conversation. David can follow up about your request.` });
-    history = history.slice(-16);
-    return true;
-  }
-
-  async function send(body, input, text) {
-    text = String(text || '').trim();
-    if (!text || busy) return;
-    add(body, text, 'user');
-    input.value = '';
-
-    if (waitingForEmail && isEmail(text)) {
-      handleEmail(body, input, text);
-      input.focus();
-      return;
-    }
-
-    for (const [pattern, answer] of davidQuickAnswers) {
-      if (pattern.test(text)) {
-        add(body, answer, 'bot');
-        history.push({ role: 'user', content: text }, { role: 'assistant', content: answer });
-        history = history.slice(-16);
-        input.focus();
-        return;
-      }
-    }
-
-    busy = true;
-    const thinking = add(body, 'Thinking…', 'bot');
-
-    try {
-      const response = await fetch(`${API_BASE}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ message: text, history })
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result.answer) throw new Error(result.error || `AI service returned ${response.status}`);
-      thinking.remove();
-      add(body, result.answer, 'bot');
-      history.push({ role: 'user', content: text }, { role: 'assistant', content: result.answer });
-      history = history.slice(-16);
-    } catch (error) {
-      thinking.remove();
-      const answer = replyFallback(text);
-      add(body, answer, 'bot');
-      history.push({ role: 'user', content: text }, { role: 'assistant', content: answer });
-      history = history.slice(-16);
-      console.warn('LeadFlow AI chat unavailable; fallback response used.', error);
-    } finally {
-      busy = false;
-      input.focus();
-    }
-  }
-
-  function removeTalkToDavidChips() {
-    document.querySelectorAll('.chip').forEach(chip => {
-      if (chip.textContent.trim().replace(/\s+/g, ' ').toLowerCase() === 'talk to david') {
-        chip.remove();
-      }
-    });
-  }
-
-  function initContactForm() {
-    const contact = document.querySelector('.contact');
-    if (!contact || contact.dataset.contactFormReady === 'true') return;
-    contact.dataset.contactFormReady = 'true';
-
-    const emailLink = contact.querySelector('.email');
-    const assistantLink = contact.querySelector('.cta');
-    if (emailLink) emailLink.remove();
-
-    const form = document.createElement('form');
-    form.className = 'lf-contact-form';
-    form.innerHTML = `
-      <div class="lf-contact-grid">
-        <input name="name" type="text" placeholder="Your name" autocomplete="name" required>
-        <input name="email" type="email" placeholder="Your email" autocomplete="email" required>
-      </div>
-      <textarea name="message" rows="4" placeholder="Tell us what you'd like to automate..." required></textarea>
-      <label class="lf-contact-consent"><input name="consent" type="checkbox" required> I agree that Lead Flow Automation may use my contact information to respond to my message.</label>
-      <button type="submit" class="cta">Send Message →</button>
-      <p class="lf-contact-status" role="status" aria-live="polite"></p>
-    `;
-    contact.insertBefore(form, assistantLink || null);
-
-    const style = document.createElement('style');
-    style.textContent = `
-      .lf-contact-form{max-width:680px;margin:24px auto 0;text-align:left}
-      .lf-contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-      .lf-contact-form input,.lf-contact-form textarea{width:100%;box-sizing:border-box;background:#0c1524;border:1px solid #2c3b53;border-radius:10px;padding:12px;color:#fff;outline:none;font:inherit}
-      .lf-contact-form textarea{resize:vertical;min-height:110px;margin-top:10px}
-      .lf-contact-form input:focus,.lf-contact-form textarea:focus{border-color:#5b8cff}
-      .lf-contact-consent{display:flex;gap:8px;align-items:flex-start;margin:12px 0;color:#9aa7ba;font-size:.72rem;line-height:1.4}
-      .lf-contact-consent input{width:auto;margin-top:3px}
-      .lf-contact-form button{width:100%;margin-top:4px}
-      .lf-contact-status{text-align:center!important;min-height:22px;margin:10px auto 0!important;font-size:.78rem!important}
-      .lf-contact-status.success{color:#b9f6ca!important}
-      .lf-contact-status.error{color:#ffb4b4!important}
-      @media(max-width:520px){.lf-contact-grid{grid-template-columns:1fr}}
-    `;
-    document.head.appendChild(style);
-
-    form.addEventListener('submit', async event => {
-      event.preventDefault();
-      const submit = form.querySelector('button[type="submit"]');
-      const status = form.querySelector('.lf-contact-status');
-      const data = new FormData(form);
-      const name = String(data.get('name') || '').trim();
-      const email = String(data.get('email') || '').trim();
-      const message = String(data.get('message') || '').trim();
-      if (!name || !email || !message) return;
-      submit.disabled = true;
-      status.className = 'lf-contact-status';
-      status.textContent = 'Sending your message…';
-      try {
-        const response = await fetch(`${API_BASE}/api/handoff`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({ name, email, reason: 'Website contact form', transcript: message })
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || result.ok !== true) throw new Error(result.error || `Request failed (${response.status})`);
-        form.reset();
-        status.className = 'lf-contact-status success';
-        status.textContent = 'Message sent successfully. David will get back to you.';
-      } catch (error) {
-        status.className = 'lf-contact-status error';
-        status.textContent = 'We could not send the message right now. Please try again or use the consultation option above.';
-        console.warn('LeadFlow contact form failed:', error);
-      } finally {
-        submit.disabled = false;
-      }
-    });
-  }
-
-  function init() {
-    const body = document.getElementById('chatBody');
-    const input = document.getElementById('chatInput');
-    const button = document.getElementById('sendBtn');
-    if (!body || !input || !button || button.dataset.aiBound) return;
-
-    button.dataset.aiBound = 'true';
-    button.addEventListener('click', event => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      send(body, input, input.value);
-    }, true);
-
-    input.addEventListener('keydown', event => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        send(body, input, input.value);
-      }
-    }, true);
-
-    document.querySelectorAll('.chip').forEach(chip => {
-      if (chip.textContent.trim().replace(/\s+/g, ' ').toLowerCase() === 'talk to david') {
-        chip.remove();
-        return;
-      }
-      if (chip.dataset.q) {
-        chip.addEventListener('click', event => {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          send(body, input, chip.dataset.q);
-        }, true);
-      }
-    });
-
-    removeTalkToDavidChips();
-    initContactForm();
-    const observer = new MutationObserver(removeTalkToDavidChips);
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  function replyFallback(text){for(const [pattern,answer] of fallback)if(pattern.test(text))return answer;waitingForEmail=true;return 'That sounds like something worth looking at specifically. I can have David get back to you about it. What’s the best email address to reach you?';}
+  function add(body,text,cls){const d=document.createElement('div');d.className=`bubble ${cls}`;d.textContent=text;body.appendChild(d);body.scrollTop=body.scrollHeight;return d;}
+  function isEmail(text){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(text||'').trim());}
+  function handleEmail(body,input,text){const email=String(text||'').trim();if(!isEmail(email)){add(body,'Please enter a valid email address so David knows where to reach you.','bot');return true;}waitingForEmail=false;try{sessionStorage.setItem('leadflow_callback_email',email);}catch(_){}add(body,`Thanks — I’ve noted ${email} for this conversation. David can follow up about your request.`,'bot');history.push({role:'user',content:email},{role:'assistant',content:`Thanks — I’ve noted ${email} for this conversation. David can follow up about your request.`});history=history.slice(-16);return true;}
+  async function send(body,input,text){text=String(text||'').trim();if(!text||busy)return;add(body,text,'user');input.value='';if(waitingForEmail&&isEmail(text)){handleEmail(body,input,text);input.focus();return;}for(const [pattern,answer] of davidQuickAnswers){if(pattern.test(text)){add(body,answer,'bot');history.push({role:'user',content:text},{role:'assistant',content:answer});history=history.slice(-16);input.focus();return;}}busy=true;const thinking=add(body,'Thinking…','bot');try{const response=await fetch(`${API_BASE}/api/chat`,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({message:text,history})});const result=await response.json().catch(()=>({}));if(!response.ok||!result.answer)throw new Error(result.error||`AI service returned ${response.status}`);thinking.remove();add(body,result.answer,'bot');history.push({role:'user',content:text},{role:'assistant',content:result.answer});history=history.slice(-16);}catch(error){thinking.remove();const answer=replyFallback(text);add(body,answer,'bot');history.push({role:'user',content:text},{role:'assistant',content:answer});history=history.slice(-16);console.warn('LeadFlow AI chat unavailable; fallback response used.',error);}finally{busy=false;input.focus();}}
+  function removeTalkToDavidChips(){document.querySelectorAll('.chip').forEach(chip=>{if(chip.textContent.trim().replace(/\s+/g,' ').toLowerCase()==='talk to david')chip.remove();});}
+  function initContactForm(){const contact=document.querySelector('.contact');if(!contact||contact.dataset.contactFormReady==='true')return;contact.dataset.contactFormReady='true';const emailLink=contact.querySelector('.email');const assistantLink=contact.querySelector('.cta');if(emailLink)emailLink.remove();const form=document.createElement('form');form.className='lf-contact-form';form.innerHTML=`<div class="lf-contact-grid"><input name="name" type="text" placeholder="Your name" autocomplete="name" required><input name="email" type="email" placeholder="Your email" autocomplete="email" required></div><textarea name="message" rows="4" placeholder="Tell us what you'd like to automate..." required></textarea><label class="lf-contact-consent"><input name="consent" type="checkbox" required> I agree that Lead Flow Automation may use my contact information to respond to my message.</label><button type="submit" class="cta">Send Message →</button><p class="lf-contact-status" role="status" aria-live="polite"></p>`;contact.insertBefore(form,assistantLink||null);const style=document.createElement('style');style.textContent=`.lf-contact-form{max-width:680px;margin:24px auto 0;text-align:left}.lf-contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.lf-contact-form input,.lf-contact-form textarea{width:100%;box-sizing:border-box;background:#0c1524;border:1px solid #2c3b53;border-radius:10px;padding:12px;color:#fff;outline:none;font:inherit}.lf-contact-form textarea{resize:vertical;min-height:110px;margin-top:10px}.lf-contact-form input:focus,.lf-contact-form textarea:focus{border-color:#5b8cff}.lf-contact-consent{display:flex;gap:8px;align-items:flex-start;margin:12px 0;color:#9aa7ba;font-size:.72rem;line-height:1.4}.lf-contact-consent input{width:auto;margin-top:3px}.lf-contact-form button{width:100%;margin-top:4px}.lf-contact-status{text-align:center!important;min-height:22px;margin:10px auto 0!important;font-size:.78rem!important}.lf-contact-status.success{color:#b9f6ca!important}.lf-contact-status.error{color:#ffb4b4!important}@media(max-width:520px){.lf-contact-grid{grid-template-columns:1fr}}`;document.head.appendChild(style);form.addEventListener('submit',async event=>{event.preventDefault();const submit=form.querySelector('button[type="submit"]'),status=form.querySelector('.lf-contact-status'),data=new FormData(form),name=String(data.get('name')||'').trim(),email=String(data.get('email')||'').trim(),message=String(data.get('message')||'').trim();if(!name||!email||!message)return;submit.disabled=true;status.className='lf-contact-status';status.textContent='Sending your message…';try{const response=await fetch(`${API_BASE}/api/handoff`,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({name,email,reason:'Website contact form',transcript:message})});const result=await response.json().catch(()=>({}));if(!response.ok||result.ok!==true||result.emailSent!==true)throw new Error(result.error||'Email delivery could not be confirmed');form.reset();status.className='lf-contact-status success';status.textContent='Message sent successfully. David will get back to you.';}catch(error){status.className='lf-contact-status error';status.textContent='We could not send the message right now. Please try again or use the consultation option above.';console.warn('LeadFlow contact form failed:',error);}finally{submit.disabled=false;}});}
+  function init(){const body=document.getElementById('chatBody'),input=document.getElementById('chatInput'),button=document.getElementById('sendBtn');if(!body||!input||!button)return;if(!button.dataset.aiBound){button.dataset.aiBound='true';button.addEventListener('click',event=>{event.preventDefault();event.stopImmediatePropagation();send(body,input,input.value);},true);input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();event.stopImmediatePropagation();send(body,input,input.value);}},true);document.querySelectorAll('.chip').forEach(chip=>{if(chip.textContent.trim().replace(/\s+/g,' ').toLowerCase()==='talk to david'){chip.remove();return;}if(chip.dataset.q)chip.addEventListener('click',event=>{event.preventDefault();event.stopImmediatePropagation();send(body,input,chip.dataset.q);},true);});}removeTalkToDavidChips();initContactForm();const observer=new MutationObserver(removeTalkToDavidChips);observer.observe(document.body,{childList:true,subtree:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
