@@ -85,6 +85,34 @@
     });
   }
 
+  function addContactSuccessFade() {
+    if (document.getElementById('lf-contact-success-fade')) return;
+    const style = document.createElement('style');
+    style.id = 'lf-contact-success-fade';
+    style.textContent = `.lf-contact-success-fade{opacity:1;transition:opacity .7s ease,transform .7s ease;transform:translateY(0)}.lf-contact-success-fade.lf-contact-success-hide{opacity:0;transform:translateY(-4px);pointer-events:none}`;
+    document.head.appendChild(style);
+  }
+
+  function fadeContactSuccessMessages(root = document) {
+    const candidates = root.querySelectorAll ? root.querySelectorAll('p,div,span') : [];
+    candidates.forEach(el => {
+      if (el.dataset.lfContactFade === 'true') return;
+      const text = el.textContent.trim().replace(/\s+/g, ' ').toLowerCase();
+      if (!text.includes('message sent successfully') || !text.includes('david will get back to you')) return;
+      el.dataset.lfContactFade = 'true';
+      el.classList.add('lf-contact-success-fade');
+      window.setTimeout(() => el.classList.add('lf-contact-success-hide'), 3500);
+      window.setTimeout(() => { if (el.isConnected) el.remove(); }, 4300);
+    });
+  }
+
+  function watchContactSuccess() {
+    addContactSuccessFade();
+    fadeContactSuccessMessages();
+    const observer = new MutationObserver(() => fadeContactSuccessMessages());
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
   function openQualification() {
     if (document.querySelector('.lfq-overlay')) return; injectStyles();
     const overlay = document.createElement('div'); overlay.className = 'lfq-overlay';
@@ -97,6 +125,7 @@
     injectStyles();
     removeTalkToDavidChip();
     loadLiveChat();
+    watchContactSuccess();
     const chips = document.querySelector('.chips');
     if (chips && !chips.querySelector('[data-lfq-launch]')) { const button = document.createElement('button'); button.type = 'button'; button.className = 'chip lfq-launch'; button.dataset.lfqLaunch = 'true'; button.textContent = 'Get a free consultation →'; chips.appendChild(button); }
     removeTalkToDavidChip();
