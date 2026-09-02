@@ -139,6 +139,10 @@
     }, true);
 
     document.querySelectorAll('.chip[data-q]').forEach(chip => {
+      if (chip.textContent.trim().toLowerCase() === 'talk to david') {
+        chip.remove();
+        return;
+      }
       chip.addEventListener('click', event => {
         event.preventDefault();
         event.stopImmediatePropagation();
