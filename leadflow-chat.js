@@ -125,6 +125,79 @@
     });
   }
 
+  function initContactForm() {
+    const contact = document.querySelector('.contact');
+    if (!contact || contact.dataset.contactFormReady === 'true') return;
+    contact.dataset.contactFormReady = 'true';
+
+    const emailLink = contact.querySelector('.email');
+    const assistantLink = contact.querySelector('.cta');
+    if (emailLink) emailLink.remove();
+
+    const form = document.createElement('form');
+    form.className = 'lf-contact-form';
+    form.innerHTML = `
+      <div class="lf-contact-grid">
+        <input name="name" type="text" placeholder="Your name" autocomplete="name" required>
+        <input name="email" type="email" placeholder="Your email" autocomplete="email" required>
+      </div>
+      <textarea name="message" rows="4" placeholder="Tell us what you'd like to automate..." required></textarea>
+      <label class="lf-contact-consent"><input name="consent" type="checkbox" required> I agree that Lead Flow Automation may use my contact information to respond to my message.</label>
+      <button type="submit" class="cta">Send Message →</button>
+      <p class="lf-contact-status" role="status" aria-live="polite"></p>
+    `;
+    contact.insertBefore(form, assistantLink || null);
+
+    const style = document.createElement('style');
+    style.textContent = `
+      .lf-contact-form{max-width:680px;margin:24px auto 0;text-align:left}
+      .lf-contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+      .lf-contact-form input,.lf-contact-form textarea{width:100%;box-sizing:border-box;background:#0c1524;border:1px solid #2c3b53;border-radius:10px;padding:12px;color:#fff;outline:none;font:inherit}
+      .lf-contact-form textarea{resize:vertical;min-height:110px;margin-top:10px}
+      .lf-contact-form input:focus,.lf-contact-form textarea:focus{border-color:#5b8cff}
+      .lf-contact-consent{display:flex;gap:8px;align-items:flex-start;margin:12px 0;color:#9aa7ba;font-size:.72rem;line-height:1.4}
+      .lf-contact-consent input{width:auto;margin-top:3px}
+      .lf-contact-form button{width:100%;margin-top:4px}
+      .lf-contact-status{text-align:center!important;min-height:22px;margin:10px auto 0!important;font-size:.78rem!important}
+      .lf-contact-status.success{color:#b9f6ca!important}
+      .lf-contact-status.error{color:#ffb4b4!important}
+      @media(max-width:520px){.lf-contact-grid{grid-template-columns:1fr}}
+    `;
+    document.head.appendChild(style);
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const submit = form.querySelector('button[type="submit"]');
+      const status = form.querySelector('.lf-contact-status');
+      const data = new FormData(form);
+      const name = String(data.get('name') || '').trim();
+      const email = String(data.get('email') || '').trim();
+      const message = String(data.get('message') || '').trim();
+      if (!name || !email || !message) return;
+      submit.disabled = true;
+      status.className = 'lf-contact-status';
+      status.textContent = 'Sending your message…';
+      try {
+        const response = await fetch(`${API_BASE}/api/handoff`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ name, email, reason: 'Website contact form', transcript: message })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.ok !== true) throw new Error(result.error || `Request failed (${response.status})`);
+        form.reset();
+        status.className = 'lf-contact-status success';
+        status.textContent = 'Message sent successfully. David will get back to you.';
+      } catch (error) {
+        status.className = 'lf-contact-status error';
+        status.textContent = 'We could not send the message right now. Please try again or use the consultation option above.';
+        console.warn('LeadFlow contact form failed:', error);
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  }
+
   function init() {
     const body = document.getElementById('chatBody');
     const input = document.getElementById('chatInput');
@@ -161,6 +234,7 @@
     });
 
     removeTalkToDavidChips();
+    initContactForm();
     const observer = new MutationObserver(removeTalkToDavidChips);
     observer.observe(document.body, { childList: true, subtree: true });
   }
