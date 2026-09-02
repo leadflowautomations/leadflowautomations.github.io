@@ -117,6 +117,14 @@
     }
   }
 
+  function removeTalkToDavidChips() {
+    document.querySelectorAll('.chip').forEach(chip => {
+      if (chip.textContent.trim().replace(/\s+/g, ' ').toLowerCase() === 'talk to david') {
+        chip.remove();
+      }
+    });
+  }
+
   function init() {
     const body = document.getElementById('chatBody');
     const input = document.getElementById('chatInput');
@@ -138,17 +146,23 @@
       }
     }, true);
 
-    document.querySelectorAll('.chip[data-q]').forEach(chip => {
-      if (chip.textContent.trim().toLowerCase() === 'talk to david') {
+    document.querySelectorAll('.chip').forEach(chip => {
+      if (chip.textContent.trim().replace(/\s+/g, ' ').toLowerCase() === 'talk to david') {
         chip.remove();
         return;
       }
-      chip.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        send(body, input, chip.dataset.q);
-      }, true);
+      if (chip.dataset.q) {
+        chip.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          send(body, input, chip.dataset.q);
+        }, true);
+      }
     });
+
+    removeTalkToDavidChips();
+    const observer = new MutationObserver(removeTalkToDavidChips);
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
