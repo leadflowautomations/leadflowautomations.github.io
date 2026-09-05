@@ -43,3 +43,12 @@ jobs:
           done
           echo 'Prospect Intelligence Worker health check failed.'
           exit 1
+      - name: Smoke test live prospect search
+        working-directory: .
+        run: |
+          set -euo pipefail
+          URL='https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev/api/prospect-search?location=Miami&country=United%20States&industry=real%20estate&limit=10'
+          RESPONSE=$(curl -fsS --retry 2 --max-time 120 "$URL")
+          echo "$RESPONSE" | grep -q '"ok":true'
+          echo "$RESPONSE" | grep -q '"prospects"'
+          echo 'Prospect Intelligence live search smoke test passed.'
