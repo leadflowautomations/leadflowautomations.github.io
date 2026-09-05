@@ -1,0 +1,7 @@
+const UPSTREAM='https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev';
+const ORIGIN='https://leadflowautomations.github.io';
+const ALLOWED=new Set([ORIGIN,'https://leadflowautomations-github-io.pages.dev']);
+function cors(origin){return {'Access-Control-Allow-Origin':ALLOWED.has(origin)?origin:ORIGIN,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Accept','Access-Control-Max-Age':'86400','Vary':'Origin','Cache-Control':'no-store'}}
+function response(body,status,origin,headers={}){return new Response(body,{status,headers:{...cors(origin),...headers}})}
+async function fetchUpstream(request){const u=new URL(request.url);const target=UPSTREAM+u.pathname+u.search;const headers=new Headers();const ct=request.headers.get('Content-Type');if(ct)headers.set('Content-Type',ct);headers.set('Accept','application/json');const init={method:request.method,headers};if(request.method!=='GET'&&request.method!=='HEAD')init.body=await request.arrayBuffer();return fetch(target,init)}
+export default{async fetch(request){const origin=request.headers.get('Origin')||ORIGIN;if(request.method==='OPTIONS')return response(null,204,origin);try{const r=await fetchUpstream(request);const body=await r.arrayBuffer();return response(body,r.status,origin,{'Content-Type':r.headers.get('Content-Type')||'application/json; charset=utf-8'})}catch(e){return response(JSON.stringify({ok:false,error:'Prospect research gateway unavailable'}),502,origin,{'Content-Type':'application/json; charset=utf-8'})}}};
