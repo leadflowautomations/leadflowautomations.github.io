@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/wrangler@latest/config-schema.json",
   "name": "leadflow-prospect-intelligence",
-  "main": "src/v3.js",
+  "main": "src/v4.js",
   "compatibility_date": "2026-09-05",
   "workers_dev": true
 }
