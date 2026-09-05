@@ -5,30 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Lead Flow — Prospect Intelligence</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;background:#0b0b0d;color:#f4f1eb;font-family:Arial,sans-serif;-webkit-tap-highlight-color:transparent}
-.wrap{max-width:1100px;margin:auto;padding:32px 18px 60px}
-.brand{font:22px Georgia;letter-spacing:.12em}
-.ey{color:#c8a979;font-size:10px;letter-spacing:.18em;text-transform:uppercase;margin-top:55px}
-h1{font:48px Georgia;margin:10px 0}
-.sub,.status{color:#99969e;line-height:1.6;font-size:13px}
-.panel{margin-top:28px;padding:22px;background:#151519;border:1px solid #2b2b31;border-radius:10px}
-.fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.field label{display:block;color:#99969e;font-size:9px;letter-spacing:.13em;text-transform:uppercase;margin-bottom:7px}
-input{width:100%;padding:14px;background:#0f0f12;border:1px solid #2b2b31;border-radius:6px;color:#fff;box-sizing:border-box;font-size:16px}
-button{display:block;position:relative;z-index:10;width:auto;min-width:280px;padding:16px 20px;margin-top:16px;background:#c8a979;border:0;color:#111;text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:700;border-radius:3px;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;appearance:none;pointer-events:auto}
-button:active{transform:scale(.99)}
-button:disabled{opacity:.55;cursor:wait}
-.status{margin-top:16px;min-height:42px}
-.results{margin-top:18px;display:grid;gap:12px}
-.prospect{padding:18px;border:1px solid #2b2b31;background:#111114;border-radius:8px}
-.top{display:flex;justify-content:space-between;gap:16px}.name{font-size:15px;font-weight:700}.score{font:32px Georgia;color:#c8a979}
-.meta,.detail,.signal,.research{color:#99969e;font-size:10px;margin-top:6px;line-height:1.75}
-.detail{border-top:1px solid #2b2b31;padding-top:12px;margin-top:12px}.detail a{color:#c8a979}
-.badge{display:inline-block;margin-top:8px;margin-right:5px;padding:4px 7px;border:1px solid #3a3940;border-radius:999px;font-size:8px;color:#c8a979}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.box{padding:11px;border:1px solid #25252b;border-radius:6px;background:#0d0d10}.box b{color:#d8d0c4}
-.weak{margin-top:10px;color:#d7d2c9;font-size:10px;line-height:1.7}.empty{padding:30px;text-align:center;color:#68666c;border:1px dashed #2b2b31}
-@media(max-width:700px){.fields,.grid{grid-template-columns:1fr}h1{font-size:44px}.top{align-items:flex-start}button{width:100%;min-height:54px}}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;background:#0b0b0d;color:#f4f1eb;font-family:Arial,sans-serif;-webkit-tap-highlight-color:transparent}.wrap{max-width:1100px;margin:auto;padding:32px 18px 60px}.brand{font:22px Georgia;letter-spacing:.12em}.ey{color:#c8a979;font-size:10px;letter-spacing:.18em;text-transform:uppercase;margin-top:55px}h1{font:48px Georgia;margin:10px 0}.sub,.status{color:#99969e;line-height:1.6;font-size:13px}.panel{margin-top:28px;padding:22px;background:#151519;border:1px solid #2b2b31;border-radius:10px}.fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.field label{display:block;color:#99969e;font-size:9px;letter-spacing:.13em;text-transform:uppercase;margin-bottom:7px}input{display:block;width:100%;padding:14px;background:#0f0f12;border:1px solid #2b2b31;border-radius:6px;color:#fff;font-size:16px;line-height:1.2}button{display:block;position:relative;z-index:9999;width:auto;min-width:280px;min-height:54px;padding:16px 20px;margin-top:16px;background:#c8a979;border:0;color:#111;text-transform:uppercase;letter-spacing:.12em;font-size:10px;font-weight:700;border-radius:3px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-appearance:none;appearance:none;pointer-events:auto}button:active{transform:scale(.985)}button:disabled{opacity:.55;cursor:wait}.status{margin-top:16px;min-height:42px}.results{margin-top:18px;display:grid;gap:12px}.prospect{padding:18px;border:1px solid #2b2b31;background:#111114;border-radius:8px}.top{display:flex;justify-content:space-between;gap:16px}.name{font-size:15px;font-weight:700}.score{font:32px Georgia;color:#c8a979}.meta,.detail,.signal,.research{color:#99969e;font-size:10px;margin-top:6px;line-height:1.75}.detail{border-top:1px solid #2b2b31;padding-top:12px;margin-top:12px}.detail a{color:#c8a979}.badge{display:inline-block;margin-top:8px;margin-right:5px;padding:4px 7px;border:1px solid #3a3940;border-radius:999px;font-size:8px;color:#c8a979}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.box{padding:11px;border:1px solid #25252b;border-radius:6px;background:#0d0d10}.box b{color:#d8d0c4}.weak{margin-top:10px;color:#d7d2c9;font-size:10px;line-height:1.7}.empty{padding:30px;text-align:center;color:#68666c;border:1px dashed #2b2b31}@media(max-width:700px){.fields,.grid{grid-template-columns:1fr}h1{font-size:44px}.top{align-items:flex-start}button{width:100%}}
 </style>
 </head>
 <body>
@@ -38,12 +15,14 @@ button:disabled{opacity:.55;cursor:wait}
 <h1>Research the real opportunity.</h1>
 <p class="sub">Lead Flow discovers businesses, enriches public records, finds official websites when missing, inspects available website data, extracts public contact details and ranks the automation opportunity. It never invents missing information.</p>
 <section class="panel">
+<form id="researchForm" novalidate>
 <div class="fields">
 <div class="field"><label for="location">City / area</label><input id="location" value="Miami" autocomplete="address-level2"></div>
 <div class="field"><label for="country">Country</label><input id="country" value="United States" autocomplete="country-name"></div>
-<div class="field"><label for="industry">Industry</label><input id="industry" value="Real estate"></div>
+<div class="field"><label for="industry">Industry</label><input id="industry" value="Real estate" autocomplete="off"></div>
 </div>
-<button id="discover" type="button">Discover &amp; deeply research →</button>
+<button id="discover" type="submit">Discover &amp; deeply research →</button>
+</form>
 <div class="status" id="status" aria-live="polite">Ready. Tap the button to start live research.</div>
 <div class="results" id="results"><div class="empty">Your researched and ranked prospects will appear here.</div></div>
 </section>
@@ -51,25 +30,32 @@ button:disabled{opacity:.55;cursor:wait}
 <script>
 (function(){
 'use strict';
-const API='https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev/api/prospect-search';
-const $=function(id){return document.getElementById(id)};
-const btn=$('discover'),status=$('status'),results=$('results');
+var API='https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev/api/prospect-search';
+var form=document.getElementById('researchForm');
+var btn=document.getElementById('discover');
+var status=document.getElementById('status');
+var results=document.getElementById('results');
+var running=false;
 function esc(x){return String(x==null?'':x).replace(/[&<>\"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]||c})}
-function safeUrl(x){try{const u=new URL(x);return /^https?:$/.test(u.protocol)?u.href:''}catch(e){return ''}}
+function safeUrl(x){try{var u=new URL(x);return /^https?:$/.test(u.protocol)?u.href:''}catch(e){return ''}}
 function list(a){return Array.isArray(a)?a.filter(Boolean):[]}
 function render(p,i){
- const d=document.createElement('div');d.className='prospect';
- const r=p.research||{},website=safeUrl(p.website||r.url),socials=list(r.socials||p.socials),services=list(r.services),weak=list(p.weaknesses),phones=list(r.phones),emails=list(r.emails),badges=[p.tier,p.confidence&&('Confidence: '+p.confidence),p.verified?'Website inspected':p.websiteFoundBySearch?'Website found & inspected':'Public record only'].filter(Boolean),signals=r.signals||{};
+ var d=document.createElement('div');d.className='prospect';
+ var r=p.research||{},website=safeUrl(p.website||r.url),socials=list(r.socials||p.socials),services=list(r.services),weak=list(p.weaknesses),phones=list(r.phones),emails=list(r.emails),badges=[p.tier,p.confidence&&('Confidence: '+p.confidence),p.verified?'Website inspected':p.websiteFoundBySearch?'Website found & inspected':'Public record only'].filter(Boolean),signals=r.signals||{};
  d.innerHTML='<div class="top"><div><div class="name">#'+(i+1)+' · '+esc(p.name)+'</div><div class="meta">'+esc(r.address||p.address||'Address not listed')+' · '+esc(p.source||'Public record')+'</div>'+badges.map(function(x){return '<span class="badge">'+esc(x)+'</span>'}).join('')+'</div><div class="score">'+esc(p.score==null?'—':p.score)+'</div></div>'+(r.title?'<div class="research"><b>Website:</b> '+esc(r.title)+'</div>':'')+(r.description?'<div class="research">'+esc(r.description.slice(0,420))+'</div>':'')+'<div class="grid"><div class="box"><b>Contact &amp; public details</b><div class="detail">Website: '+(website?'<a href="'+esc(website)+'" target="_blank" rel="noopener noreferrer">'+esc(website)+'</a>':'Not found')+'<br>Phone: '+esc(phones.join(' · ')||p.phone||'Not found')+'<br>Email: '+esc(emails.join(' · ')||p.email||'Not found')+'<br>Socials: '+esc(socials.join(' · ')||'Not found')+'</div></div><div class="box"><b>Research signals</b><div class="signal">'+esc(services.length?'Services/signals: '+services.join(', '):'Services could not be confidently extracted')+'<br>Lead form: '+(signals.hasForm?'Detected':'Not detected')+' · CTA: '+(signals.hasCTA?'Detected':'Not detected')+'<br>AI/chat: '+(signals.hasChat?'Detected':'Not detected')+' · Qualification: '+(signals.hasQualification?'Detected':'Not detected')+(signals.rating?' · Public rating: '+esc(signals.rating):'')+'</div></div></div>'+(weak.length?'<div class="weak"><strong>Opportunity signals:</strong> '+weak.slice(0,5).map(esc).join(' · ')+'</div>':'')+'<div class="signal"><b>Evidence:</b> '+esc(list(p.evidence).slice(-6).join(' · '))+'</div>';
  return d;
 }
 async function discover(){
- const location=$('location').value.trim(),country=$('country').value.trim(),industry=$('industry').value.trim();
+ var location=document.getElementById('location').value.trim();
+ var country=document.getElementById('country').value.trim();
+ var industry=document.getElementById('industry').value.trim();
  if(!location||!country||!industry)throw new Error('Enter a city/area, country and industry first.');
  status.textContent='1/4 Locating and discovering businesses…';
- const u=API+'?location='+encodeURIComponent(location)+'&country='+encodeURIComponent(country)+'&industry='+encodeURIComponent(industry)+'&limit=100';
- const response=await fetch(u,{method:'GET',headers:{Accept:'application/json'},cache:'no-store'});
- let data;try{data=await response.json()}catch(e){throw new Error('Prospect Intelligence API returned an unreadable response.')}
+ var u=API+'?location='+encodeURIComponent(location)+'&country='+encodeURIComponent(country)+'&industry='+encodeURIComponent(industry)+'&limit=100';
+ var response;
+ try{response=await fetch(u,{method:'GET',mode:'cors',headers:{Accept:'application/json'},cache:'no-store',credentials:'omit'})}catch(e){throw new Error('Could not connect to the Prospect Intelligence server. Check your internet connection and try again.')}
+ var data;
+ try{data=await response.json()}catch(e){throw new Error('Prospect Intelligence API returned an unreadable response (HTTP '+response.status+').')}
  if(!response.ok||!data.ok)throw new Error((data&&data.error)||('Prospect Intelligence API returned HTTP '+response.status)+(data&&data.detail?' — '+data.detail:''));
  status.textContent='2/4 '+data.count+' businesses discovered. Enriching public records…';
  await new Promise(function(resolve){setTimeout(resolve,250)});
@@ -79,18 +65,23 @@ async function discover(){
  data.prospects.forEach(function(p,i){results.appendChild(render(p,i))});
  status.textContent='4/4 Research complete — '+data.count+' businesses found; '+(data.researched||0)+' deeply researched and ranked.';
 }
-async function handleDiscover(e){
- if(e){e.preventDefault();e.stopPropagation()}
- if(btn.disabled)return;
- btn.disabled=true;btn.textContent='DEEP RESEARCHING…';
+async function handleSubmit(e){
+ if(e)e.preventDefault();
+ if(running)return false;
+ running=true;
+ btn.disabled=true;
+ btn.setAttribute('aria-busy','true');
+ btn.textContent='DEEP RESEARCHING…';
  status.textContent='Starting prospect research…';
  results.innerHTML='<div class="empty">Lead Flow is discovering businesses, finding websites, extracting public details and scoring opportunities. This can take a little longer because it is actually researching the strongest candidates.</div>';
  try{await discover()}catch(e){console.error(e);status.textContent='RESEARCH FAILED: '+(e&&e.message?e.message:'Unknown error');results.innerHTML='<div class="empty">The server-backed research request failed. The exact error is shown above.</div>'}
- finally{btn.disabled=false;btn.textContent='Discover & deeply research →'}
+ finally{running=false;btn.disabled=false;btn.removeAttribute('aria-busy');btn.textContent='Discover & deeply research →'}
+ return false;
 }
-btn.addEventListener('click',handleDiscover,false);
-btn.addEventListener('touchend',handleDiscover,{passive:false});
-window.addEventListener('pageshow',function(){btn.disabled=false;btn.textContent='Discover & deeply research →'});
+form.addEventListener('submit',handleSubmit,false);
+btn.addEventListener('click',function(e){e.preventDefault();handleSubmit(e)},false);
+btn.addEventListener('pointerup',function(e){if(e.pointerType==='touch'){e.preventDefault();handleSubmit(e)}},false);
+window.startProspectResearch=handleSubmit;
 })();
 </script>
 </body>
