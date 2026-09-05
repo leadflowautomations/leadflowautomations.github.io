@@ -1,0 +1,45 @@
+name: Deploy Prospect Intelligence Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/prospect-intelligence/**'
+      - '.github/workflows/deploy-prospect-intelligence.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/prospect-intelligence
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Wrangler
+        run: npm install --global wrangler
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler deploy
+      - name: Verify Worker health
+        working-directory: .
+        run: |
+          set -euo pipefail
+          URL='https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev/api/health'
+          for attempt in $(seq 1 12); do
+            if curl -fsS --retry 2 --max-time 10 "$URL" | grep -q '"ok":true'; then
+              echo 'Prospect Intelligence Worker health check passed.'
+              exit 0
+            fi
+            echo "Worker is not ready yet (attempt ${attempt}/12); retrying..."
+            sleep 5
+          done
+          echo 'Prospect Intelligence Worker health check failed.'
+          exit 1
