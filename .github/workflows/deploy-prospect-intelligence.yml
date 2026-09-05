@@ -63,3 +63,13 @@ jobs:
           echo "$RESEARCH" | grep -q '"ok":true'
           echo "$RESEARCH" | grep -q '"results"'
           echo 'Prospect Intelligence individual research smoke test passed.'
+      - name: Smoke test official-domain discovery
+        working-directory: .
+        run: |
+          set -euo pipefail
+          PAYLOAD='{"location":"Miami","industry":"real estate","prospects":[{"name":"Douglas Elliman Real Estate","address":"1021 Kane Concourse Bay Harbor Islands FL 33154","industry":"real estate","source":"Smoke test"}]}'
+          RESEARCH=$(curl -fsS --retry 2 --max-time 120 -H 'Content-Type: application/json' -d "$PAYLOAD" 'https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev/api/prospect-research')
+          echo "$RESEARCH" | grep -q '"ok":true'
+          echo "$RESEARCH" | grep -q '"verified":true'
+          echo "$RESEARCH" | grep -q 'elliman.com'
+          echo 'Official-domain discovery smoke test passed.'
