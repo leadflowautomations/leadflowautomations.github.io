@@ -52,3 +52,14 @@ jobs:
           echo "$RESPONSE" | grep -q '"ok":true'
           echo "$RESPONSE" | grep -q '"prospects"'
           echo 'Prospect Intelligence live search smoke test passed.'
+      - name: Smoke test individual prospect research
+        working-directory: .
+        run: |
+          set -euo pipefail
+          SEARCH_URL='https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev/api/prospect-search?location=Miami&country=United%20States&industry=real%20estate&limit=1'
+          SEARCH=$(curl -fsS --retry 2 --max-time 120 "$SEARCH_URL")
+          PAYLOAD=$(node -e "const x=JSON.parse(process.argv[1]); if(!x.ok||!x.prospects?.length) process.exit(2); process.stdout.write(JSON.stringify({location:'Miami',industry:'real estate',prospects:[x.prospects[0]]}))" "$SEARCH")
+          RESEARCH=$(curl -fsS --retry 2 --max-time 120 -H 'Content-Type: application/json' -d "$PAYLOAD" 'https://leadflow-prospect-intelligence.leadflowautomations-dav.workers.dev/api/prospect-research')
+          echo "$RESEARCH" | grep -q '"ok":true'
+          echo "$RESEARCH" | grep -q '"results"'
+          echo 'Prospect Intelligence individual research smoke test passed.'
