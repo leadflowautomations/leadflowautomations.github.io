@@ -10,7 +10,7 @@
 <body>
 <header class="top"><div class="wrap"><a href="index.html">↗ Lead Flow Automation</a><a class="back" href="score.html">← Step 4 · Score</a></div></header>
 <main>
-<section class="hero wrap"><div class="eyebrow">Lead Flow · Step 05</div><h1>Rank the opportunities.<br><span>Start with the strongest.</span></h1><p>Step 5 now runs the Lead Flow pipeline from the target criteria: discover, verify, research signals, score, then rank. It does not invent or change the opportunity score.</p></section>
+<section class="hero wrap"><div class="eyebrow">Lead Flow · Step 05</div><h1>Rank the opportunities.<br><span>Start with the strongest.</span></h1><p>Step 5 runs broad market discovery, verification, signal research, evidence-backed scoring, then ranking. Discovery searches a 40 km market radius and keeps all unique source records up to the system safety ceiling.</p></section>
 <section class="wrap">
 <div class="panel">
 <div class="controls">
@@ -19,22 +19,23 @@
 <div class="field"><label for="industry">Industry</label><input id="industry" value="Real Estate" placeholder="e.g. Real Estate"></div>
 <button class="run" id="run">Find & Rank Opportunities →</button>
 </div>
-<div class="status" id="status">One action runs discovery → verification → signal research → scoring → ranking.</div>
-<div class="hint">No JSON copying is required. A manual Step 4 JSON fallback is available below for development/testing.</div>
+<div class="status" id="status">One action runs broad discovery → verification → research → scoring → ranking.</div>
+<div class="hint">Discovery can collect up to 1,000 source records. Research and scoring run in batches so the whole discovered set can be processed.</div>
 </div>
 <div class="panel" style="margin-top:12px"><div class="field"><label for="source">Optional: existing Step 4 scored prospects JSON</label><textarea id="source" placeholder="Leave blank for the automatic pipeline. Paste Step 4 JSON only when you need to test ranking in isolation."></textarea></div></div>
 <div class="summary" id="summary"><div class="stat"><small>Ranked</small><strong id="n">0</strong></div><div class="stat"><small>Top score</small><strong id="top">—</strong></div><div class="stat"><small>P1</small><strong id="p1">0</strong></div><div class="stat"><small>P2</small><strong id="p2">0</strong></div><div class="stat"><small>P3</small><strong id="p3">0</strong></div><div class="stat"><small>P4</small><strong id="p4">0</strong></div></div>
 <div class="results" id="results"><article class="lead">No ranked businesses loaded yet.</article></div>
 </section></main>
-<footer class="foot wrap">Lead Flow Automation · Step 5 — Rank · Discover → Verify → Research → Score → Rank.</footer>
+<footer class="foot wrap">Lead Flow Automation · Step 5 — Rank · Broad Discover → Verify → Research → Score → Rank.</footer>
 <script>
 const API=(window.LEADFLOW_API_BASE||'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev').replace(/\/$/,'');
-const $=id=>document.getElementById(id);let items=[];
+const $=id=>document.getElementById(id);let items=[];const BATCH=100;
 $('run').onclick=runPipeline;
 $('location').addEventListener('keydown',e=>{if(e.key==='Enter')runPipeline()});
 function esc(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function setStatus(t,error=false){$('status').textContent=t;$('status').className='status'+(error?' error':'')}
 async function api(path,options={}){const r=await fetch(`${API}${path}`,{headers:{Accept:'application/json','Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`${path} returned HTTP ${r.status}.`);return d}
+async function batched(path,prospects,extra,onProgress){const out=[];for(let start=0;start<prospects.length;start+=BATCH){const batch=prospects.slice(start,start+BATCH);onProgress?.(start+batch.length,prospects.length);const d=await api(path,{method:'POST',body:JSON.stringify({location:extra.location,industry:extra.industry,prospects:batch})});out.push(...(d.prospects||[]));}return out}
 async function runPipeline(){
  const location=$('location').value.trim(),country=$('country').value.trim(),industry=$('industry').value.trim();if(!location||!industry)return setStatus('Enter a location and industry first.',true);
  const btn=$('run');btn.disabled=true;$('summary').classList.remove('show');$('results').innerHTML='<article class="lead">Starting the pipeline…</article>';
@@ -42,13 +43,13 @@ async function runPipeline(){
   let prospects=[];const manual=$('source').value.trim();
   if(manual){let parsed;try{parsed=JSON.parse(manual)}catch{throw new Error('The optional Step 4 JSON is invalid. Clear it to run the automatic pipeline.')}prospects=Array.isArray(parsed)?parsed:(Array.isArray(parsed.prospects)?parsed.prospects:[]);if(!prospects.length)throw new Error('The supplied Step 4 JSON contains no prospects.');setStatus(`Using ${prospects.length} existing Step 4 scored businesses…`)}
   else{
-   setStatus('Step 1/5 — discovering real businesses…');const d=await api(`/api/prospect-search?${new URLSearchParams({location,country,industry,limit:'100'})}`,{method:'GET',headers:{'Content-Type':'application/json'}});prospects=Array.isArray(d.prospects)?d.prospects:[];if(!prospects.length)throw new Error('Discovery returned no businesses. Try a broader location or industry.');
+   setStatus('Step 1/5 — discovering the market…');const d=await api(`/api/prospect-search?${new URLSearchParams({location,country,industry,limit:'1000'})}`,{method:'GET',headers:{'Content-Type':'application/json'}});prospects=Array.isArray(d.prospects)?d.prospects:[];if(!prospects.length)throw new Error('Discovery returned no businesses. Try a broader location or industry.');setStatus(`Step 1/5 complete — discovered ${prospects.length} businesses across the search area.`);
    setStatus(`Step 2/5 — verifying ${prospects.length} discovered businesses…`);const v=await api('/api/prospect-verify',{method:'POST',body:JSON.stringify({industry,prospects})});prospects=(v.prospects||[]).filter(p=>p?.verification?.verified!==false&&!p?.verification?.duplicateOf);if(!prospects.length)throw new Error('Verification left no usable businesses.');
-   setStatus(`Step 3/5 — researching ${prospects.length} verified businesses…`);const s=await api('/api/prospect-signals',{method:'POST',body:JSON.stringify({location,industry,prospects})});prospects=s.prospects||[];if(!prospects.length)throw new Error('Signal research returned no businesses.');
-   setStatus(`Step 4/5 — scoring ${prospects.length} researched businesses…`);const sc=await api('/api/prospect-score',{method:'POST',body:JSON.stringify({location,industry,prospects})});prospects=sc.prospects||[];if(!prospects.length)throw new Error('Scoring returned no businesses.');
+   prospects=await batched('/api/prospect-signals',prospects,{location,industry},(done,total)=>setStatus(`Step 3/5 — researching ${done}/${total} verified businesses…`));if(!prospects.length)throw new Error('Signal research returned no businesses.');
+   const scored=[];for(let start=0;start<prospects.length;start+=BATCH){const batch=prospects.slice(start,start+BATCH);setStatus(`Step 4/5 — scoring ${Math.min(start+BATCH,prospects.length)}/${prospects.length} researched businesses…`);const sc=await api('/api/prospect-score',{method:'POST',body:JSON.stringify({location,industry,prospects:batch})});scored.push(...(sc.prospects||[]));}prospects=scored;if(!prospects.length)throw new Error('Scoring returned no businesses.');
   }
   setStatus(`Step 5/5 — ranking ${prospects.length} scored businesses…`);const ranked=await api('/api/prospect-rank',{method:'POST',body:JSON.stringify({location,industry,prospects})});items=ranked.prospects||[];if(!items.length)throw new Error('Ranking returned no businesses.');
-  sessionStorage.setItem('leadflow.rankedProspects',JSON.stringify(items));sessionStorage.setItem('leadflow.rankingContext',JSON.stringify({location,country,industry,updatedAt:new Date().toISOString()}));render(ranked.summary);setStatus(`Pipeline complete — #1 is ${items[0]?.name||'the top opportunity'}.`);
+  sessionStorage.setItem('leadflow.rankedProspects',JSON.stringify(items));sessionStorage.setItem('leadflow.rankingContext',JSON.stringify({location,country,industry,updatedAt:new Date().toISOString(),discoveredCount:items.length}));render(ranked.summary);setStatus(`Pipeline complete — ${items.length} businesses ranked. #1 is ${items[0]?.name||'the top opportunity'}.`);
  }catch(e){items=[];$('results').innerHTML=`<article class="lead">${esc(e.message||'Pipeline failed.')}</article>`;setStatus(e.message||'Pipeline failed.',true)}finally{btn.disabled=false}
 }
 function render(s){$('summary').classList.add('show');$('n').textContent=s?.ranked??items.length;$('top').textContent=s?.topScore??(items[0]?.score?.score??'—');$('p1').textContent=s?.p1??0;$('p2').textContent=s?.p2??0;$('p3').textContent=s?.p3??0;$('p4').textContent=s?.p4??0;$('results').innerHTML=items.map((p,i)=>{const x=p.score||{},r=p.ranking||{},g=x.gaps||[];return `<article class="lead"><div class="head"><div class="identity"><span class="rank">#${r.rank||i+1}</span><div><div class="name">${esc(p.name||'Unnamed business')}</div><div class="sub">${esc(x.priority||'P4')} · ${esc(x.opportunity||'Low')} · ${esc(x.confidence||'low')} evidence</div></div></div><div class="score">${esc(x.score??0)}<span>/100</span></div></div><div class="bar"><i style="width:${Math.max(0,Math.min(100,Number(x.score)||0))}%"></i></div><div class="chips">${g.slice(0,4).map(v=>`<span class="chip gap">Gap: ${esc(v.label)}</span>`).join('')}<span class="chip">${esc(r.actionableGapWeight??0)} gap points</span></div><div class="why">${esc(r.rankingReason||'Ordered from the evidence-backed Step 4 score.')}</div><button class="detail" data-detail="${i}">View business details →</button></article>`}).join('');document.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>{sessionStorage.setItem('leadflow.selectedProspect',JSON.stringify(items[+b.dataset.detail]));location.href='detail.html'})}
