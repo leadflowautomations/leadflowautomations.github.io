@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "leadflow-assistant-api",
-  "main": "src/entry-step5.js",
+  "main": "src/entry-step5-verify.js",
   "compatibility_date": "2026-08-31",
   "ai": {
     "binding": "AI"
