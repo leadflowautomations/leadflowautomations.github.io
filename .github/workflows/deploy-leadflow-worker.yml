@@ -144,3 +144,29 @@ jobs:
               console.log(`Step 5 discovery route passed with ${data.prospects.length} businesses.`);
             });
           '
+
+      - name: Verify Step 5 verification route
+        working-directory: .
+        run: |
+          set -euo pipefail
+          BODY='{"industry":"Real Estate","prospects":[{"name":"The Keyes Company","website":"https://www.keyes.com","phone":"+1 305 371 3000","address":"Miami, Florida","source":"OpenStreetMap"},{"name":"The Keyes Company","website":"https://www.keyes.com","phone":"+1 305 371 3000","address":"Miami, Florida","source":"OpenStreetMap"}]}'
+          echo "Checking live Step 5 verification endpoint..."
+          RESPONSE="$(curl -sS --retry 2 --max-time 30 -X POST -H 'Accept: application/json' -H 'Content-Type: application/json' --data "$BODY" 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev/api/prospect-verify')"
+          printf '%s\n' "$RESPONSE" | node -e '
+            let input="";
+            process.stdin.on("data",c=>input+=c);
+            process.stdin.on("end",()=>{
+              const data=JSON.parse(input);
+              if(data?.ok!==true || !Array.isArray(data.prospects) || !data.summary) {
+                console.error("Step 5 verification endpoint returned an invalid response:");
+                console.error(JSON.stringify(data));
+                process.exit(1);
+              }
+              if(data.summary.duplicates < 1) {
+                console.error("Verification did not detect the intentional duplicate test record.");
+                console.error(JSON.stringify(data.summary));
+                process.exit(1);
+              }
+              console.log(`Step 5 verification route passed: ${data.summary.verified} verified, ${data.summary.needsReview} needs review, ${data.summary.duplicates} duplicate.`);
+            });
+          '
