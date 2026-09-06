@@ -7,8 +7,7 @@ on:
     paths:
       - 'backend/prospect-signals.js'
       - 'backend/prospect-scoring.js'
-      - 'backend/cloudflare/src/entry-step4.js'
-      - 'backend/cloudflare/src/index.js'
+      - 'backend/cloudflare/src/entry-step4-test.js'
       - 'backend/cloudflare/wrangler.step4-test.jsonc'
       - 'backend/cloudflare/step4-live-validation.mjs'
       - '.github/workflows/validate-step4.yml'
@@ -47,21 +46,24 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: wrangler deploy --config wrangler.step4-test.jsonc
 
-      - name: Validate test Worker health
+      - name: Validate isolated Worker health
         working-directory: .
         env:
           TEST_WORKER_URL: https://leadflow-assistant-api-step4-test.leadflowautomations-dav.workers.dev
         run: |
           set -euo pipefail
           for attempt in $(seq 1 12); do
-            if curl -fsS --retry 2 --max-time 10 "$TEST_WORKER_URL/api/health" | grep -q '"ok":true'; then
-              echo 'Step 4 test Worker health check passed.'
+            response="$(curl -sS --max-time 10 -w '\n%{http_code}' "$TEST_WORKER_URL/api/step4-health" || true)"
+            body="${response%$'\n'*}"
+            code="${response##*$'\n'}"
+            if [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"ok":true'; then
+              echo 'Step 4 isolated Worker health check passed.'
               exit 0
             fi
-            echo "Test Worker is not ready yet (attempt ${attempt}/12); retrying..."
+            echo "Test Worker is not ready/healthy (attempt ${attempt}/12, HTTP ${code}): ${body}"
             sleep 5
           done
-          echo 'Step 4 test Worker health check failed.'
+          echo 'Step 4 isolated Worker health check failed.'
           exit 1
 
       - name: Run real Step 3 to Step 4 validation
