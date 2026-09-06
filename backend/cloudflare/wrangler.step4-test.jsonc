@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "leadflow-assistant-api-step4-test",
-  "main": "src/entry.js",
+  "main": "src/entry-step4.js",
   "compatibility_date": "2026-08-31"
 }
