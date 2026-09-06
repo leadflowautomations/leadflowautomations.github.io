@@ -31,7 +31,7 @@ async function reachable(url){
 }
 async function parallel(items,limit,fn){const out=new Array(items.length);let cursor=0;await Promise.all(Array.from({length:Math.min(limit,items.length)},async()=>{while(true){const i=cursor++;if(i>=items.length)return;out[i]=await fn(items[i],i);}}));return out;}
 export async function verifyProspects(prospects,industry){
-  // Verification validates identity/category and flags activity; it must not discard legitimate businesses merely because an OSM record lacks a website or phone.
+  // Verification validates identity/category and uniqueness first. Activity can be enriched later by public contact research.
   const list=Array.isArray(prospects)?prospects.slice(0,1000):[];
   const results=await parallel(list,8,async p=>{const website=await reachable(p?.website);const contact=Boolean(clean(p?.phone)||clean(p?.email));const active=website.reachable||contact;const activeConfidence=website.reachable?'high':contact?'medium':'low';const category=categoryMatch(p,industry);return {...p,__verification:{active,activeConfidence,category,website,contact}};});
   const seen=new Map();
@@ -39,9 +39,10 @@ export async function verifyProspects(prospects,industry){
     const nameKey=norm(p?.name),addressKey=norm(p?.address),lat=Number(p?.latitude),lon=Number(p?.longitude);let duplicateOf=null;
     for(const [key,prior] of seen){const sameName=nameKey&&key.startsWith(nameKey+'|');const sameAddress=addressKey&&prior.addressKey===addressKey;const near=Number.isFinite(lat)&&Number.isFinite(lon)&&Number.isFinite(prior.lat)&&Number.isFinite(prior.lon)&&Math.abs(lat-prior.lat)<0.0015&&Math.abs(lon-prior.lon)<0.0015&&nameKey===prior.nameKey;if(sameName&&(sameAddress||near)){duplicateOf=prior.index;break;}}
     if(nameKey)seen.set(`${nameKey}|${addressKey}`,{index:index+1,nameKey,addressKey,lat,lon});
-    const v=p.__verification;delete p.__verification;const unique=!duplicateOf;const categoryFit=Boolean(v.category.match);
-    const verified=Boolean(unique&&categoryFit&&v.active);
-    const status=duplicateOf?'duplicate':!unique?'duplicate':!categoryFit?'needs-review':v.active?'verified':'needs-review';
-    return {...p,verification:{verified,status,eligible:Boolean(unique&&categoryFit),active:v.active,activeConfidence:v.activeConfidence,categoryMatch:v.category.match,categoryConfidence:v.category.confidence,unique,duplicateOf,website:{checked:v.website.checked,reachable:v.website.reachable,status:v.website.status||null,reason:v.website.reason||'',url:v.website.url||p.website||''},evidence:[v.active?(v.website.reachable?'Website responded successfully':'Public phone/email signal found'):'No active public signal found',v.category.reason,unique?'No duplicate match found':`Duplicate of result #${duplicateOf}`,categoryFit?'Category accepted for downstream research':'Category needs review']}};
+    const v=p.__verification;delete p.__verification;const unique=!duplicateOf;const categoryFit=Boolean(v.category.match);const sourceBacked=/openstreetmap|photon/i.test(String(p?.source||''));
+    // An industry-specific discovery source is enough to verify identity/category/uniqueness before research. Contact research separately confirms outreach activity.
+    const verified=Boolean(unique&&categoryFit&&(v.active||sourceBacked));
+    const status=duplicateOf?'duplicate':!unique?'duplicate':!categoryFit?'needs-review':verified?'verified':'needs-review';
+    return {...p,verification:{verified,status,eligible:Boolean(unique&&categoryFit),active:v.active,activeConfidence:v.activeConfidence,categoryMatch:v.category.match,categoryConfidence:v.category.confidence,unique,duplicateOf,website:{checked:v.website.checked,reachable:v.website.reachable,status:v.website.status||null,reason:v.website.reason||'',url:v.website.url||p.website||''},evidence:[v.active?(v.website.reachable?'Website responded successfully':'Public phone/email signal found'):sourceBacked?'Industry-specific OpenStreetMap discovery record accepted; activity will be confirmed by contact research':'No active public signal found',v.category.reason,unique?'No duplicate match found':`Duplicate of result #${duplicateOf}`,categoryFit?'Category accepted for downstream research':'Category needs review']}};
   });
 }
