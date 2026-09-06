@@ -5,6 +5,17 @@ const ALLOWED = new Set(['https://leadflowautomations.github.io','https://leadfl
 const cors = origin => ({'Access-Control-Allow-Origin':ALLOWED.has(origin)?origin:'https://leadflowautomations.github.io','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization, Accept','Access-Control-Max-Age':'86400','Vary':'Origin'});
 const json = (data,status=200,origin='https://leadflowautomations.github.io') => new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...cors(origin)}});
 
+function buildSignals(p){
+  const r=p.research||{}, s=r.signals||{}, website=Boolean(p.website), inspected=r.status==='inspected';
+  const text=(r.title+' '+r.description+' '+(r.headings||[]).join(' ')).toLowerCase();
+  const booking = Boolean(s.hasBooking || /book now|book online|schedule online|appointment|booking|reserve|reservation|calendly|acuity|setmore|simplybook|mindbody|square appointments|fresha/i.test(text));
+  const reviews = Boolean(s.hasTestimonials || /review|reviews|testimonial|testimonials|client stories|google rating|rating/i.test(text) || s.rating);
+  const social = (r.socials||[]).length > 0;
+  const seo = inspected ? {title:Boolean(r.title),description:Boolean(r.description),headings:(r.headings||[]).length>0,contentLength:Number(r.contentLength||0),healthy:Boolean(r.title&&r.description&&(r.headings||[]).length>0)} : {title:false,description:false,headings:false,contentLength:0,healthy:false};
+  const contact = Boolean((r.phones||[]).length || (r.emails||[]).length || p.phone || p.email);
+  return {website:{present:website,reachable:inspected,status:inspected?'Inspected':website?'Found but not inspected':'Not found',https:website ? /^https:/i.test(p.website) : false,title:r.title||''},contact:{present:contact,summary:contact?'Direct contact signal found':'No direct contact signal found',phones:r.phones||[],emails:r.emails||[]},booking:{present:booking,summary:booking?'Booking/appointment signal detected':'No obvious booking system signal'},reviews:{present:reviews,summary:reviews?'Reviews/testimonial signal detected':'No obvious review/testimonial signal',rating:s.rating||''},social:{present:social,summary:social?`${r.socials.length} social profile link(s) detected`:'No social profile links detected',profiles:r.socials||[]},seo:{healthy:seo.healthy,summary:seo.healthy?'Basic title + description + headings detected':'Basic SEO signals are incomplete',...seo},technology:{chat:Boolean(s.hasChat),qualification:Boolean(s.hasQualification),form:Boolean(s.hasForm),analytics:Boolean(s.hasAnalytics)},evidence:r.evidence||[]};
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -20,8 +31,9 @@ export default {
         if (!prospects.length) return json({ok:false,error:'prospects are required.'},400,origin);
         if (prospects.length > 100) return json({ok:false,error:'A maximum of 100 prospects can be researched at once.'},400,origin);
         const researched = await researchProspects(prospects,{location,industry});
-        const summary = {researched:researched.length,inspected:researched.filter(p=>p.research?.status==='inspected').length,websiteFound:researched.filter(p=>p.research?.status==='website-found').length,publicRecordOnly:researched.filter(p=>p.research?.status==='public-record-only').length};
-        return json({ok:true,stage:'research-signals',version:'2026-09-06.1',location,industry,summary,prospects:researched},200,origin);
+        const output = researched.map(p=>({...p,signals:buildSignals(p),researchedAt:new Date().toISOString()}));
+        const summary = {researched:output.length,inspected:output.filter(p=>p.research?.status==='inspected').length,websiteFound:output.filter(p=>p.research?.status==='website-found').length,publicRecordOnly:output.filter(p=>p.research?.status==='public-record-only').length};
+        return json({ok:true,stage:'research-signals',version:'2026-09-06.2',location,industry,summary,prospects:output},200,origin);
       } catch (error) {
         return json({ok:false,error:error?.message||'Signal research failed.'},500,origin);
       }
