@@ -15,9 +15,9 @@ export default {async fetch(request,env,ctx){
     try{
       const data=await response.json();
       if(Array.isArray(data?.prospects)){
-        const prospects=await enrichContacts(data.prospects,{location:text(data?.location),industry:text(data?.industry)});
+        const prospects=await enrichContacts(data.prospects,{location:text(data?.location),industry:text(data?.industry),browser:env?.BROWSER});
         data.prospects=prospects;
-        data.summary={...(data.summary||{}),contactEnriched:prospects.filter(p=>p?.phone&&p?.email).length,phoneFound:prospects.filter(p=>p?.phone).length,emailFound:prospects.filter(p=>p?.email).length};
+        data.summary={...(data.summary||{}),contactEnriched:prospects.filter(p=>p?.phone&&p?.email).length,phoneFound:prospects.filter(p=>p?.phone).length,emailFound:prospects.filter(p=>p?.email).length,browserContactResearch:Boolean(env?.BROWSER)};
       }
       return json(data,response.status,origin);
     }catch(e){return json({ok:false,error:e?.message||'Contact enrichment failed.'},500,origin)}
