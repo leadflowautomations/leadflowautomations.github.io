@@ -1,0 +1,61 @@
+name: Validate LeadFlow Step 4
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [step-4-score]
+    paths:
+      - 'backend/prospect-signals.js'
+      - 'backend/prospect-scoring.js'
+      - 'backend/cloudflare/src/entry-step4.js'
+      - 'backend/cloudflare/src/index.js'
+      - 'backend/cloudflare/wrangler.step4-test.jsonc'
+      - 'backend/cloudflare/step4-live-validation.mjs'
+      - '.github/workflows/validate-step4.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/cloudflare
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Wrangler
+        run: npm install --global wrangler
+
+      - name: Deploy isolated Step 4 test Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler deploy --config wrangler.step4-test.jsonc
+
+      - name: Validate test Worker health
+        working-directory: .
+        env:
+          TEST_WORKER_URL: https://leadflow-assistant-api-step4-test.leadflowautomations-dav.workers.dev
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if curl -fsS --retry 2 --max-time 10 "$TEST_WORKER_URL/api/health" | grep -q '"ok":true'; then
+              echo "Step 4 test Worker health check passed."
+              exit 0
+            fi
+            echo "Test Worker is not ready yet (attempt ${attempt}/12); retrying..."
+            sleep 5
+          done
+          echo "Step 4 test Worker health check failed."
+          exit 1
+
+      - name: Run real Step 3 to Step 4 validation
+        working-directory: .
+        env:
+          TEST_WORKER_URL: https://leadflow-assistant-api-step4-test.leadflowautomations-dav.workers.dev
+        run: node backend/cloudflare/step4-live-validation.mjs
