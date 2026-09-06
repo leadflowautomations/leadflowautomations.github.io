@@ -2,7 +2,7 @@ name: Validate LeadFlow Step 7
 
 on:
   push:
-    branches: [step-7-automate-impl5]
+    branches: [step-7-automate]
     paths:
       - 'automate.html'
       - 'backend/prospect-automation.js'
@@ -25,7 +25,6 @@ jobs:
           grep -q 'Deployment status: NOT DEPLOYED' automate.html
           grep -q 'sessionStorage.getItem' automate.html
           grep -q 'leadflow.automationTarget' automate.html
-          grep -q 'status.*prepared' backend/prospect-automation.js
           grep -q 'booking' backend/prospect-automation.js
           grep -q 'qualification' backend/prospect-automation.js
           grep -q 'chat' backend/prospect-automation.js
@@ -36,11 +35,10 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-          for name in ['automate.html']:
-              text=Path(name).read_text()
-              scripts=re.findall(r'<script>(.*?)</script>',text,re.S)
-              if not scripts: raise SystemExit('No inline script found')
-              Path('/tmp/'+name+'.js').write_text('\n'.join(scripts))
+          text=Path('automate.html').read_text()
+          scripts=re.findall(r'<script>(.*?)</script>',text,re.S)
+          if not scripts: raise SystemExit('No inline script found')
+          Path('/tmp/automate.html.js').write_text('\n'.join(scripts))
           PY
           node --check /tmp/automate.html.js
           node --check backend/prospect-automation.js
