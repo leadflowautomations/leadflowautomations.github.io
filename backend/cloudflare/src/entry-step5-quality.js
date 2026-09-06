@@ -1,4 +1,4 @@
-import base from './entry-step5.js';
+import base from './entry-step5-verify.js';
 
 const ORIGIN='https://leadflowautomations.github.io';
 const ALLOWED=new Set([ORIGIN,'https://leadflowautomations-github-io.pages.dev']);
