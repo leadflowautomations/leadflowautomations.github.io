@@ -46,9 +46,7 @@ function normalize(elements,country,industry){
     const tags=element.tags||{},name=text(tags.name),lat=element.lat??element.center?.lat,lon=element.lon??element.center?.lon;
     if(!name||lat==null||lon==null)continue;
     const hay=`${name} ${tags.description||''} ${tags['official_name']||''}`.toLowerCase();
-    if(keywords.length&&!keywords.some(k=>hay.includes(k))&&industry.toLowerCase().includes('real estate')===false&&industry.toLowerCase()!=='realtor'){
-      continue;
-    }
+    if(keywords.length&&!keywords.some(k=>hay.includes(k))&&industry.toLowerCase().includes('real estate')===false&&industry.toLowerCase()!=='realtor')continue;
     const key=`${name.toLowerCase()}|${Math.round(Number(lat)*1000)}|${Math.round(Number(lon)*1000)}`;
     if(seen.has(key))continue;seen.add(key);
     const website=text(tags.website||tags['contact:website']||tags.url),phone=text(tags.phone||tags['contact:phone']),email=text(tags.email||tags['contact:email']);
@@ -66,7 +64,7 @@ async function discover(location,country,industry,limit){
   if(!geoRes.ok)throw new Error(`Location lookup failed (HTTP ${geoRes.status}).`);
   const geo=await geoRes.json();if(!geo?.[0])throw new Error(`Could not locate ${q}, ${c}.`);
   const lat=Number(geo[0].lat),lon=Number(geo[0].lon);
-  const overpass=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'content-type':'text/plain;charset=UTF-8'},body:buildOverpassQuery(tags,lat,lon,25000)});
+  const overpass=await fetch('https://overpass.kumi.systems/api/interpreter',{method:'POST',headers:{'content-type':'text/plain;charset=UTF-8'},body:buildOverpassQuery(tags,lat,lon,25000)});
   if(!overpass.ok)throw new Error(`Business discovery failed (HTTP ${overpass.status}).`);
   const data=await overpass.json();
   const prospects=normalize(data.elements,c,i).slice(0,Math.min(Math.max(Number(limit)||50,1),50));
