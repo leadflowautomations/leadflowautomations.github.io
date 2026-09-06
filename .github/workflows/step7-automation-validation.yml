@@ -1,0 +1,49 @@
+name: Step 7 Automation Validation
+on:
+  push:
+    branches: [step-7-automate]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate automation plan from live ranked business
+        run: |
+          set -euo pipefail
+          export API='https://leadflow-assistant-api.leadflowautomations-dav.workers.dev'
+          node <<'NODE'
+          const API=process.env.API;
+          async function call(path,opts={}){
+            const r=await fetch(API+path,{...opts,headers:{accept:'application/json','content-type':'application/json'}});
+            const t=await r.text(); let d;
+            try{d=JSON.parse(t)}catch{throw Error(`${path} returned non-JSON HTTP ${r.status}: ${t.slice(0,300)}`)}
+            if(!r.ok||d?.ok!==true)throw Error(`${path} failed HTTP ${r.status}: ${JSON.stringify(d)}`);
+            return d;
+          }
+          const q={location:'Miami',country:'United States',industry:'Real Estate',limit:5};
+          const discovered=await call(`/api/prospect-search?location=${encodeURIComponent(q.location)}&country=${encodeURIComponent(q.country)}&industry=${encodeURIComponent(q.industry)}&limit=${q.limit}`);
+          const verified=await call('/api/prospect-verify',{method:'POST',body:JSON.stringify({industry:q.industry,prospects:discovered.prospects})});
+          const eligible=verified.prospects.filter(p=>p.verification?.duplicate!==true&&p.verification?.verified!==false);
+          const signals=await call('/api/prospect-signals',{method:'POST',body:JSON.stringify({location:q.location,industry:q.industry,prospects:eligible})});
+          const scored=await call('/api/prospect-score',{method:'POST',body:JSON.stringify({location:q.location,industry:q.industry,prospects:signals.prospects})});
+          const ranked=await call('/api/prospect-rank',{method:'POST',body:JSON.stringify({location:q.location,industry:q.industry,prospects:scored.prospects})});
+          const p=ranked.prospects[0];
+          if(!p)throw Error('No ranked business available');
+          const labels=(p.score?.gaps||[]).map(g=>String(g.label).toLowerCase());
+          const rules=[
+            ['Booking / appointment automation',/booking|appointment/],
+            ['Lead capture automation',/lead capture|form/],
+            ['Lead qualification automation',/qualification/],
+            ['AI / live chat automation',/AI|chat/],
+            ['Lead tracking & analytics automation',/analytics|measurement/],
+            ['SEO foundation automation',/SEO/]
+          ];
+          const recs=rules.filter(([,re])=>labels.some(label=>re.test(label)));
+          if(!recs.length)throw Error(`No automation recommendation derived from ranked business gaps: ${labels.join(', ')}`);
+          if(!p.score?.confidence)throw Error('Automation target is missing Step 4 evidence confidence');
+          console.log(`AUTOMATION TARGET PASS: #1 ${p.name}`);
+          console.log(`Score: ${p.score.score}/100 | ${p.score.opportunity} | ${p.score.priority} | confidence: ${p.score.confidence}`);
+          console.log(`Observed gaps: ${(p.score.gaps||[]).map(g=>g.label).join(', ')}`);
+          console.log(`Prepared recommendations: ${recs.map(([name])=>name).join(' | ')}`);
+          console.log('DEPLOYMENT SAFETY PASS: validation prepares recommendations only; no external business system is modified.');
+          console.log('STEP 7 AUTOMATION VALIDATION PASSED');
+          NODE
