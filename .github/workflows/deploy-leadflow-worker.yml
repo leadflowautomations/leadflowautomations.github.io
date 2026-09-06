@@ -5,6 +5,9 @@ on:
     branches: [main, step-7-automate]
     paths:
       - 'backend/cloudflare/**'
+      - 'backend/prospect-signals.js'
+      - 'backend/prospect-scoring.js'
+      - 'backend/prospect-ranking.js'
       - '.github/workflows/deploy-leadflow-worker.yml'
   workflow_dispatch:
 
