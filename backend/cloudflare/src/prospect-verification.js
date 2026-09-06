@@ -15,10 +15,11 @@ const WORDS={
 };
 const clean=v=>String(v??'').trim();
 const norm=v=>clean(v).toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+const STOP=new Set(['the','and','for','of','in','on','to','a','an','services','service','company','companies','business','businesses','agency','agencies']);
 const categoryMatch=(p,industry)=>{
-  const i=norm(industry),words=WORDS[i]||[];
-  if(!words.length)return {match:true,confidence:'medium',reason:'Industry is accepted by the discovery pipeline.'};
-  const hay=norm([p?.name,p?.website,p?.address].filter(Boolean).join(' '));
+  const i=norm(industry),words=(WORDS[i]||i.split(' ').filter(w=>w.length>2&&!STOP.has(w))).slice(0,8);
+  if(!words.length)return {match:false,confidence:'low',reason:'No usable industry terms were supplied for category verification.'};
+  const hay=norm([p?.name,p?.website,p?.address,p?.description].filter(Boolean).join(' '));
   if(words.some(w=>hay.includes(norm(w))))return {match:true,confidence:'high',reason:`Business record contains ${industry}-relevant category evidence.`};
   if(String(p?.source||'').toLowerCase().includes('openstreetmap'))return {match:true,confidence:'medium',reason:'Business was returned from an industry-specific OpenStreetMap discovery tag.'};
   return {match:false,confidence:'medium',reason:`No clear ${industry} category evidence was found in the public record.`};
@@ -27,11 +28,10 @@ async function reachable(url){
   const site=clean(url);if(!site)return {checked:false,reachable:false,reason:'No website listed.'};
   const target=/^https?:\/\//i.test(site)?site:`https://${site}`;
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),5500);
-  try{let r=await fetch(target,{method:'HEAD',redirect:'follow',headers:{accept:'text/html,application/xhtml+xml','user-agent':'LeadFlowAutomation/1.0'},signal:controller.signal});if(!r.ok&&(r.status===405||r.status===403||r.status===400))r=await fetch(target,{method:'GET',redirect:'follow',headers:{accept:'text/html,application/xhtml+xml','range':'bytes=0-2048','user-agent':'LeadFlowAutomation/1.0'},signal:controller.signal});return {checked:true,reachable:r.ok,status:r.status,url:r.url||target,reason:r.ok?'Website responded successfully':`Website returned HTTP ${r.status}.`};}catch(error){return {checked:true,reachable:false,url:target,reason:error?.name==='AbortError'?'Website check timed out':'Website could not be reached.'};}finally{clearTimeout(timer);}
+  try{let r=await fetch(target,{method:'HEAD',redirect:'follow',headers:{accept:'text/html,application/xhtml+xml','user-agent':'LeadFlowAutomation/2.0'},signal:controller.signal});if(!r.ok&&(r.status===405||r.status===403||r.status===400))r=await fetch(target,{method:'GET',redirect:'follow',headers:{accept:'text/html,application/xhtml+xml','range':'bytes=0-2048','user-agent':'LeadFlowAutomation/2.0'},signal:controller.signal});return {checked:true,reachable:r.ok,status:r.status,url:r.url||target,reason:r.ok?'Website responded successfully':`Website returned HTTP ${r.status}.`};}catch(error){return {checked:true,reachable:false,url:target,reason:error?.name==='AbortError'?'Website check timed out':'Website could not be reached.'};}finally{clearTimeout(timer);}
 }
 async function parallel(items,limit,fn){const out=new Array(items.length);let cursor=0;await Promise.all(Array.from({length:Math.min(limit,items.length)},async()=>{while(true){const i=cursor++;if(i>=items.length)return;out[i]=await fn(items[i],i);}}));return out;}
 export async function verifyProspects(prospects,industry){
-  // Verification establishes business identity/category/uniqueness before enrichment. Contact data is deliberately not required at this stage.
   const list=Array.isArray(prospects)?prospects.slice(0,1000):[];
   const results=await parallel(list,8,async p=>{const website=await reachable(p?.website);const contact=Boolean(clean(p?.phone)||clean(p?.email));const active=website.reachable||contact;const activeConfidence=website.reachable?'high':contact?'medium':'low';const category=categoryMatch(p,industry);const sourceIndustryVerified=category.match&&String(p?.source||'').toLowerCase().includes('openstreetmap');return {...p,__verification:{active,activeConfidence,category,website,contact,sourceIndustryVerified}};});
   const seen=new Map();
@@ -41,7 +41,7 @@ export async function verifyProspects(prospects,industry){
     if(nameKey)seen.set(`${nameKey}|${addressKey}`,{index:index+1,nameKey,addressKey,lat,lon});
     const v=p.__verification;delete p.__verification;const unique=!duplicateOf;const categoryFit=Boolean(v.category.match);
     const verified=Boolean(unique&&categoryFit&&(v.active||v.sourceIndustryVerified));
-    const status=duplicateOf?'duplicate':!unique?'duplicate':!categoryFit?'needs-review':verified?'verified':'needs-review';
+    const status=duplicateOf?'duplicate':!categoryFit?'needs-review':verified?'verified':'needs-review';
     return {...p,verification:{verified,status,eligible:Boolean(unique&&categoryFit),active:v.active,activeConfidence:v.activeConfidence,categoryMatch:v.category.match,categoryConfidence:v.category.confidence,unique,duplicateOf,industrySourceVerified:v.sourceIndustryVerified,website:{checked:v.website.checked,reachable:v.website.reachable,status:v.website.status||null,reason:v.website.reason||'',url:v.website.url||p.website||''},evidence:[v.active?(v.website.reachable?'Website responded successfully':'Public phone/email signal found'):v.sourceIndustryVerified?'Industry-specific discovery source accepted as business verification':'No active public signal found',v.category.reason,unique?'No duplicate match found':`Duplicate of result #${duplicateOf}`,categoryFit?'Category accepted for downstream research':'Category needs review']}};
   });
 }
