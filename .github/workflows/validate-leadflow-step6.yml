@@ -1,0 +1,58 @@
+name: Validate LeadFlow Step 6
+
+on:
+  push:
+    branches: [step-6-detail]
+    paths:
+      - 'detail.html'
+      - 'rank.html'
+      - '.github/workflows/validate-leadflow-step6.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Step 6 structure
+        run: |
+          set -euo pipefail
+          test -s detail.html
+          test -s rank.html
+          grep -q 'Lead Flow · Step 06' detail.html
+          grep -q 'Business & contact' detail.html
+          grep -q 'Research status' detail.html
+          grep -q 'Signal map' detail.html
+          grep -q 'Opportunity gaps' detail.html
+          grep -q 'Detected strengths' detail.html
+          grep -q 'Services detected' detail.html
+          grep -q 'Social profiles' detail.html
+          grep -q 'Page headings' detail.html
+          grep -q 'Evidence' detail.html
+          grep -q 'Scoring & ranking explanation' detail.html
+          grep -q 'sessionStorage.getItem' detail.html
+          grep -q 'leadflow.selectedProspect' detail.html
+          grep -q 'View business details' rank.html
+          grep -q 'sessionStorage.setItem' rank.html
+          grep -q "location.href='detail.html'" rank.html
+          echo 'STEP6_STRUCTURE_VALIDATION=PASS'
+
+      - name: Validate JavaScript syntax
+        run: |
+          set -euo pipefail
+          node --version
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          for name in ['detail.html','rank.html']:
+              text=Path(name).read_text()
+              scripts=re.findall(r'<script>(.*?)</script>',text,re.S)
+              if not scripts:
+                  raise SystemExit(f'No inline script found in {name}')
+              Path('/tmp/'+name+'.js').write_text('\n'.join(scripts))
+          PY
+          node --check /tmp/detail.html.js
+          node --check /tmp/rank.html.js
+          echo 'STEP6_JS_SYNTAX_VALIDATION=PASS'
