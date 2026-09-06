@@ -21,41 +21,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
       - name: Install Wrangler
         run: npm install --global wrangler
-
       - name: Resolve D1 database ID
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "Missing required Cloudflare GitHub Actions secrets: CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID."
-            exit 1
-          fi
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then echo "Missing required Cloudflare GitHub Actions secrets."; exit 1; fi
           DB_ID="$(curl -fsS --retry 3 -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database?name=leadflow-leads&per_page=100" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(!data.success)throw new Error(JSON.stringify(data.errors||data));const db=(data.result||[]).find(x=>x.name==="leadflow-leads");if(db?.uuid)process.stdout.write(db.uuid);});')"
-          if [ -z "$DB_ID" ]; then
-            echo "D1 database leadflow-leads was not found; creating it."
-            CREATE_JSON="$(CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}" wrangler d1 create leadflow-leads --json)"
-            DB_ID="$(printf '%s' "$CREATE_JSON" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);const uuid=data.uuid||data.database_id||data.database?.uuid||data.result?.uuid;if(uuid)process.stdout.write(uuid);});')"
-          fi
-          if ! printf '%s' "$DB_ID" | grep -Eq '^[0-9a-fA-F-]{36}$'; then echo "Unable to resolve a valid D1 database UUID for leadflow-leads."; exit 1; fi
-          echo "Resolved leadflow-leads D1 database."
+          if [ -z "$DB_ID" ]; then CREATE_JSON="$(CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID}" wrangler d1 create leadflow-leads --json)"; DB_ID="$(printf '%s' "$CREATE_JSON" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);const uuid=data.uuid||data.database_id||data.database?.uuid||data.result?.uuid;if(uuid)process.stdout.write(uuid);});')"; fi
+          if ! printf '%s' "$DB_ID" | grep -Eq '^[0-9a-fA-F-]{36}$'; then echo "Unable to resolve a valid D1 database UUID."; exit 1; fi
           DB_ID="$DB_ID" node -e 'const fs=require("fs");const p="wrangler.jsonc";const s=fs.readFileSync(p,"utf8").replace("REPLACE_AFTER_D1_CREATE",process.env.DB_ID);if(s.includes("REPLACE_AFTER_D1_CREATE"))throw new Error("D1 placeholder was not replaced");fs.writeFileSync(p,s);'
-
       - name: Apply D1 migrations
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: wrangler d1 migrations apply leadflow-leads --remote
-
       - name: Configure Resend email secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -66,47 +53,45 @@ jobs:
           if [ -z "${RESEND_API_KEY:-}" ]; then echo "Missing GitHub Actions secret RESEND_API_KEY."; exit 1; fi
           printf '%s' "$RESEND_API_KEY" | wrangler secret put RESEND_API_KEY
           printf '%s' 'onboarding@resend.dev' | wrangler secret put FROM_EMAIL
-          echo "Resend Worker secrets configured with the Resend development sender."
-
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: wrangler deploy
-
       - name: Verify Worker health
         working-directory: .
         run: |
           set -euo pipefail
           for attempt in $(seq 1 12); do
             if curl -fsS --retry 2 --max-time 10 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev/api/health' | grep -q '"ok":true'; then echo "LeadFlow Worker health check passed."; exit 0; fi
-            echo "Worker is not ready yet (attempt ${attempt}/12); retrying..."; sleep 5
+            sleep 5
           done
           echo "LeadFlow Worker health check failed."; exit 1
-
       - name: Verify Step 5 discovery route
         working-directory: .
         run: |
           set -euo pipefail
           URL='https://leadflow-assistant-api.leadflowautomations-dav.workers.dev/api/prospect-search?location=Miami&country=United%20States&industry=Real%20Estate&limit=5'
-          echo "Checking live Step 5 discovery endpoint..."
           BODY="$(curl -sS --retry 1 --connect-timeout 10 --max-time 75 -H 'Accept: application/json' "$URL")"
-          printf '%s\n' "$BODY" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(data?.ok!==true||!Array.isArray(data.prospects)){console.error("Step 5 discovery endpoint returned an invalid response:");console.error(JSON.stringify(data));process.exit(1);}if(data.prospects.length===0){console.error("Step 5 discovery endpoint returned zero businesses.");process.exit(1);}console.log(`Step 5 discovery route passed with ${data.prospects.length} businesses.`);});'
-
+          printf '%s\n' "$BODY" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(data?.ok!==true||!Array.isArray(data.prospects)||!data.prospects.length)throw new Error("Discovery route returned no businesses");console.log(`Discovery route passed with ${data.prospects.length} businesses.`);});'
       - name: Measure broad market discovery
         working-directory: .
         run: |
           set -euo pipefail
           URL='https://leadflow-assistant-api.leadflowautomations-dav.workers.dev/api/prospect-search?location=Miami&country=United%20States&industry=Real%20Estate&limit=1000'
-          echo "Measuring broad multi-source discovery coverage (diagnostic; does not block deployment)..."
           BODY="$(curl -sS --retry 1 --connect-timeout 15 --max-time 150 -H 'Accept: application/json' "$URL")"
-          printf '%s\n' "$BODY" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(data?.ok!==true||!Array.isArray(data.prospects)){console.error("Broad discovery returned an invalid response:");console.error(JSON.stringify(data));process.exit(1);}console.log(`Broad discovery diagnostic: ${data.prospects.length} deduplicated businesses from ${data.source||"unknown sources"}.`);});'
-
+          printf '%s\n' "$BODY" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(data?.ok!==true||!Array.isArray(data.prospects))throw new Error("Broad discovery invalid");console.log(`Broad discovery diagnostic: ${data.prospects.length} businesses from ${data.source||"unknown sources"}.`);});'
       - name: Verify Step 5 verification route
         working-directory: .
         run: |
           set -euo pipefail
           BODY='{"industry":"Real Estate","prospects":[{"name":"The Keyes Company","website":"https://www.keyes.com","phone":"+1 305 371 3000","address":"Miami, Florida","source":"OpenStreetMap"},{"name":"The Keyes Company","website":"https://www.keyes.com","phone":"+1 305 371 3000","address":"Miami, Florida","source":"OpenStreetMap"}]}'
-          echo "Checking live Step 5 verification endpoint..."
           RESPONSE="$(curl -sS --retry 2 --max-time 30 -X POST -H 'Accept: application/json' -H 'Content-Type: application/json' --data "$BODY" 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev/api/prospect-verify')"
-          printf '%s\n' "$RESPONSE" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(data?.ok!==true||!Array.isArray(data.prospects)||!data.summary){console.error("Step 5 verification endpoint returned an invalid response:");console.error(JSON.stringify(data));process.exit(1);}if(data.summary.duplicates<1){console.error("Verification did not detect the intentional duplicate test record.");console.error(JSON.stringify(data.summary));process.exit(1);}console.log(`Step 5 verification route passed: ${data.summary.verified} verified, ${data.summary.needsReview} needs review, ${data.summary.duplicates} duplicate.`);});'
+          printf '%s\n' "$RESPONSE" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(data?.ok!==true||!data.summary||data.summary.duplicates<1)throw new Error("Verification duplicate test failed");console.log(`Verification route passed: ${data.summary.verified} verified, ${data.summary.duplicates} duplicate.`);});'
+      - name: Verify contact contamination guard
+        working-directory: .
+        run: |
+          set -euo pipefail
+          BODY='{"location":"Miami","country":"United States","industry":"Real Estate","prospects":[{"name":"Concept International Realty, Inc.","website":"https://conceptrealty.com","phone":"1788718656","email":"error-lite+f98f@duckduckgo.com","research":{"status":"website-found","phones":["1788718656"],"emails":["error-lite+f98f@duckduckgo.com"]}},{"name":"Prime Land Buyers","website":"https://example.invalid","phone":"1788718656","email":"error-lite+f98f@duckduckgo.com","research":{"status":"website-found","phones":["1788718656"],"emails":["error-lite+f98f@duckduckgo.com"]}}]}'
+          RESPONSE="$(curl -sS --retry 2 --max-time 90 -X POST -H 'Accept: application/json' -H 'Content-Type: application/json' --data "$BODY" 'https://leadflow-assistant-api.leadflowautomations-dav.workers.dev/api/prospect-signals')"
+          printf '%s\n' "$RESPONSE" | node -e 'let input="";process.stdin.on("data",c=>input+=c);process.stdin.on("end",()=>{const data=JSON.parse(input);if(data?.ok!==true||!Array.isArray(data.prospects)||data.prospects.length!==2)throw new Error(`Contact regression returned invalid response: ${JSON.stringify(data)}`);for(const p of data.prospects){if(p.phone==="1788718656"||p.email==="error-lite+f98f@duckduckgo.com")throw new Error(`Contaminated contact survived for ${p.name}: ${p.phone} ${p.email}`);}console.log("Contact contamination regression passed: known bad shared phone/email were rejected.");});'
