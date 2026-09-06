@@ -1,5 +1,6 @@
 import { researchProspects } from '../../../backend/prospect-signals.js';
 import { scoreProspects } from '../../../backend/prospect-scoring.js';
+import { rankProspects, summarizeRanking } from '../../../backend/prospect-ranking.js';
 
 const ALLOWED = new Set(['https://leadflowautomations.github.io','https://leadflowautomations-github-io.pages.dev']);
 const DEFAULT_ORIGIN = 'https://leadflowautomations.github.io';
@@ -28,15 +29,20 @@ export default {async fetch(request){
   const url=new URL(request.url),origin=request.headers.get('Origin')||DEFAULT_ORIGIN;
   if(url.pathname==='/api/step4-health')return json({ok:true,stage:'step4-test',version:'2026-09-06.3'},200,origin);
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(origin)});
-  if(url.pathname!=='/api/prospect-signals'&&url.pathname!=='/api/prospect-score')return json({ok:false,error:'Not found'},404,origin);
+  if(url.pathname!=='/api/prospect-signals'&&url.pathname!=='/api/prospect-score'&&url.pathname!=='/api/prospect-rank')return json({ok:false,error:'Not found'},404,origin);
   if(request.method!=='POST')return json({ok:false,error:'Method not allowed'},405,origin);
   try{
     const body=await request.json(),prospects=Array.isArray(body?.prospects)?body.prospects:[],location=String(body?.location||'').trim(),industry=String(body?.industry||'').trim().toLowerCase();
     if(!prospects.length)return json({ok:false,error:'prospects are required.'},400,origin);
     if(prospects.length>100)return json({ok:false,error:'A maximum of 100 prospects can be processed at once.'},400,origin);
+    if(url.pathname==='/api/prospect-rank'){
+      if(!prospects.every(p=>p?.score&&Number.isFinite(Number(p.score.score))))return json({ok:false,error:'Step 5 requires Step 4 scored prospects.'},400,origin);
+      const ranked=rankProspects(prospects);
+      return json({ok:true,stage:'rank',version:'2026-09-06.1',source:'step-4-score',location,industry,summary:summarizeRanking(ranked),prospects:ranked},200,origin);
+    }
     const prepared=await prepare(prospects,{location,industry});
     if(url.pathname==='/api/prospect-signals')return json({ok:true,stage:'research-signals',version:'2026-09-06.3',location,industry,summary:{researched:prepared.length,inspected:prepared.filter(p=>p.research?.status==='inspected').length,websiteFound:prepared.filter(p=>p.research?.status==='website-found').length,publicRecordOnly:prepared.filter(p=>p.research?.status==='public-record-only').length},prospects:prepared},200,origin);
     const output=scoreProspects(prepared);
     return json({ok:true,stage:'score',version:'2026-09-06.3',source:'step-3-research-signals',location,industry,summary:{scored:output.length,veryHigh:output.filter(p=>p.score.opportunity==='Very high').length,high:output.filter(p=>p.score.opportunity==='High').length,moderate:output.filter(p=>p.score.opportunity==='Moderate').length,low:output.filter(p=>p.score.opportunity==='Low').length},prospects:output},200,origin);
-  }catch(error){return json({ok:false,error:error?.message||'Step 4 test Worker failed.'},500,origin);}
+  }catch(error){return json({ok:false,error:error?.message||'Step 4/5 test Worker failed.'},500,origin);}
 }};
