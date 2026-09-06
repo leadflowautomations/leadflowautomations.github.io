@@ -2,7 +2,7 @@ name: Deploy LeadFlow Worker
 
 on:
   push:
-    branches: [main]
+    branches: [main, step-7-automate]
     paths:
       - 'backend/cloudflare/**'
       - '.github/workflows/deploy-leadflow-worker.yml'
