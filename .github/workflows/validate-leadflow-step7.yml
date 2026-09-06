@@ -1,0 +1,47 @@
+name: Validate LeadFlow Step 7
+
+on:
+  push:
+    branches: [step-7-automate-impl5]
+    paths:
+      - 'automate.html'
+      - 'backend/prospect-automation.js'
+      - '.github/workflows/validate-leadflow-step7.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate structure
+        run: |
+          set -euo pipefail
+          test -s automate.html
+          test -s backend/prospect-automation.js
+          grep -q 'Lead Flow · Step 07' automate.html
+          grep -q 'Automation recommendations' automate.html
+          grep -q 'Deployment status: NOT DEPLOYED' automate.html
+          grep -q 'sessionStorage.getItem' automate.html
+          grep -q 'leadflow.automationTarget' automate.html
+          grep -q 'status.*prepared' backend/prospect-automation.js
+          grep -q 'booking' backend/prospect-automation.js
+          grep -q 'qualification' backend/prospect-automation.js
+          grep -q 'chat' backend/prospect-automation.js
+          echo STEP7_STRUCTURE_VALIDATION=PASS
+      - name: Validate JavaScript syntax
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          for name in ['automate.html']:
+              text=Path(name).read_text()
+              scripts=re.findall(r'<script>(.*?)</script>',text,re.S)
+              if not scripts: raise SystemExit('No inline script found')
+              Path('/tmp/'+name+'.js').write_text('\n'.join(scripts))
+          PY
+          node --check /tmp/automate.html.js
+          node --check backend/prospect-automation.js
+          echo STEP7_JS_SYNTAX_VALIDATION=PASS
