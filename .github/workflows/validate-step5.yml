@@ -1,0 +1,27 @@
+name: Validate LeadFlow Step 5
+
+on:
+  push:
+    branches: [step-5-rank]
+    paths:
+      - 'backend/prospect-ranking.js'
+      - 'backend/prospect-ranking.test.mjs'
+      - 'backend/cloudflare/src/entry.js'
+      - 'rank.html'
+      - '.github/workflows/validate-step5.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run ranking tests
+        run: node backend/prospect-ranking.test.mjs
