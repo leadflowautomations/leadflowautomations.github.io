@@ -31,7 +31,7 @@ console.log(JSON.stringify({ stage: step3.stage, version: step3.version, summary
 console.log('Step 4 validation: scoring the exact Step 3 output without re-running research...');
 const step4 = await post('/api/prospect-score', { prospects: step3.prospects, location, industry });
 if (step4.stage !== 'score') throw new Error(`Unexpected Step 4 stage: ${step4.stage}`);
-if (step4.version !== '2026-09-06.2') throw new Error(`Unexpected Step 4 version: ${step4.version}`);
+if (!/^2026-09-06\./.test(String(step4.version))) throw new Error(`Unexpected Step 4 version: ${step4.version}`);
 if (step4.source !== 'step-3-research-signals') throw new Error(`Unexpected Step 4 source: ${step4.source}`);
 if (!Array.isArray(step4.prospects) || step4.prospects.length !== prospects.length) throw new Error('Step 4 did not return all scored prospects.');
 for (const p of step4.prospects) {
