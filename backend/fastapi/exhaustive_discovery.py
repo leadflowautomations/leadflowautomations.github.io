@@ -45,14 +45,27 @@ def _row(lf, element: dict[str, Any], industry: str) -> dict[str, Any] | None:
     return {"source_id": f"osm:{element.get('type')}:{element.get('id')}", "name": name, "address": address, "lat": lat, "lon": lon, "website": lf.clean_url(website), "phone": lf.clean_phone(phone), "email": lf.clean_email(email), "source": "OpenStreetMap/Overpass", "industry": industry}
 
 
+async def _resolve_center(lf, client, city: str, country: str):
+    last_error = None
+    for attempt in range(3):
+        try:
+            center = await lf.geocode(client, city, country)
+            if center:
+                return center
+            last_error = "geocoder returned no result"
+        except Exception as exc:
+            last_error = str(exc)[:300]
+        if attempt < 2:
+            await asyncio.sleep(1.5 * (attempt + 1))
+    raise RuntimeError(f"Unable to locate {city}, {country}: {last_error or 'unknown geocoding error'}")
+
+
 async def discover_exhaustive(lf, city: str, industry: str, country: str, job: dict[str, Any], fallback):
     tags = INDUSTRY_TAGS.get(industry.lower().strip())
     if not tags:
         return await fallback(city, industry, country, job)
     async with httpx.AsyncClient(timeout=40.0) as client:
-        center = await lf.geocode(client, city, country)
-        if not center:
-            return []
+        center = await _resolve_center(lf, client, city, country)
         lat, lon = center
         lat_span = 0.35
         lon_span = 0.45 if abs(lat) > 20 else 0.35
