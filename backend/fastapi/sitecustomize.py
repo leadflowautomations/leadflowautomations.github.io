@@ -97,22 +97,11 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
             return await _original_post(self, url, *args, **kwargs)
         try:
             elements = await _photon_elements(self, query)
-            print(f"Photon discovery adapter returned {len(elements)} elements")
+            print(f"Photon discovery adapter returned {len(elements)} elements", flush=True)
         except Exception as exc:
-            print(f"Photon discovery provider failed: {exc}")
+            print(f"Photon discovery provider failed: {exc}", flush=True)
             elements = []
         payload = {"version": 0.6, "generator": "LeadFlow Photon OSM adapter", "elements": elements}
         return httpx.Response(200, headers={"content-type": "application/json"}, content=json.dumps(payload).encode(), request=httpx.Request("POST", str(url)))
 
     httpx.AsyncClient.post = _post
-
-    if os.getenv("LEADFLOW_PHOTON_SMOKE", "").strip() == "1":
-        try:
-            with httpx.Client(timeout=20) as probe:
-                response = probe.get("https://photon.komoot.io/api/", params={"q": "estate agent", "osm_tag": "office:estate_agent", "bbox": "-80.45,25.65,-80.05,25.95", "limit": 50, "dedupe": 0}, headers={"User-Agent": _USER_AGENT})
-                response.raise_for_status()
-                features = response.json().get("features", [])
-                named = [f for f in features if (f.get("properties") or {}).get("name")]
-                print(f"LEADFLOW_PHOTON_SMOKE_RESULT count={len(named)} total_features={len(features)}")
-        except Exception as exc:
-            print(f"LEADFLOW_PHOTON_SMOKE_ERROR {exc!r}")
