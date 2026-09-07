@@ -4,7 +4,6 @@ from typing import Any
 
 import httpx
 
-
 OVERPASS_ENDPOINTS = [
     "https://overpass.private.coffee/api/interpreter",
     "https://z.overpass-api.de/api/interpreter",
@@ -24,12 +23,12 @@ INDUSTRY_TAGS = {
 }
 
 
-def _query(tags: list[tuple[str, str]], south: float, west: float, north: float, east: float) -> str:
+def _query(tags, south, west, north, east):
     clauses = "\n".join(f'nwr["{key}"="{value}"]({south},{west},{north},{east});' for key, value in tags)
-    return f'[out:json][timeout:30];({clauses});out center tags;'
+    return f'[out:json][timeout:45];({clauses});out center tags;'
 
 
-def _row(lf, element: dict[str, Any], industry: str) -> dict[str, Any] | None:
+def _row(lf, element: dict[str, Any], industry: str):
     tags = element.get("tags") or {}
     name = (tags.get("name") or tags.get("brand") or tags.get("operator") or "").strip()
     if not name:
@@ -39,13 +38,10 @@ def _row(lf, element: dict[str, Any], industry: str) -> dict[str, Any] | None:
     lon = element.get("lon") if element.get("lon") is not None else center.get("lon")
     address_parts = [tags.get("addr:housenumber"), tags.get("addr:street"), tags.get("addr:city") or tags.get("addr:suburb"), tags.get("addr:state"), tags.get("addr:postcode"), tags.get("addr:country")]
     address = ", ".join(str(x) for x in address_parts if x) or None
-    website = tags.get("contact:website") or tags.get("website")
-    phone = tags.get("contact:phone") or tags.get("phone")
-    email = tags.get("contact:email") or tags.get("email")
-    return {"source_id": f"osm:{element.get('type')}:{element.get('id')}", "name": name, "address": address, "lat": lat, "lon": lon, "website": lf.clean_url(website), "phone": lf.clean_phone(phone), "email": lf.clean_email(email), "source": "OpenStreetMap/Overpass", "industry": industry}
+    return {"source_id": f"osm:{element.get('type')}:{element.get('id')}", "name": name, "address": address, "lat": lat, "lon": lon, "website": lf.clean_url(tags.get("contact:website") or tags.get("website")), "phone": lf.clean_phone(tags.get("contact:phone") or tags.get("phone")), "email": lf.clean_email(tags.get("contact:email") or tags.get("email")), "source": "OpenStreetMap/Overpass", "industry": industry}
 
 
-async def _resolve_center(lf, client, city: str, country: str):
+async def _resolve_center(lf, client: httpx.AsyncClient, city: str, country: str):
     last_error = None
     for attempt in range(3):
         try:
@@ -64,58 +60,57 @@ async def discover_exhaustive(lf, city: str, industry: str, country: str, job: d
     tags = INDUSTRY_TAGS.get(industry.lower().strip())
     if not tags:
         return await fallback(city, industry, country, job)
-    async with httpx.AsyncClient(timeout=40.0) as client:
-        center = await _resolve_center(lf, client, city, country)
-        lat, lon = center
+    async with httpx.AsyncClient(timeout=50.0) as client:
+        lat, lon = await _resolve_center(lf, client, city, country)
         lat_span = 0.35
         lon_span = 0.45 if abs(lat) > 20 else 0.35
-        south, north = lat - lat_span, lat + lat_span
-        west, east = lon - lon_span, lon + lon_span
-        grid_rows, grid_cols = 5, 5
-        cells = []
-        for gy in range(grid_rows):
-            cell_south = south + (north - south) * gy / grid_rows
-            cell_north = south + (north - south) * (gy + 1) / grid_rows
-            for gx in range(grid_cols):
-                cell_west = west + (east - west) * gx / grid_cols
-                cell_east = west + (east - west) * (gx + 1) / grid_cols
-                cells.append((cell_south, cell_west, cell_north, cell_east))
-        job.update(stage="collect", message=f"Collecting mapped businesses across {len(cells)} search areas…", collection_queries=len(cells), collection_completed=0, updated_at=time.time())
+        pending = [(lat - lat_span, lon - lon_span, lat + lat_span, lon + lon_span, 0)]
+        completed = 0
         rows: list[dict[str, Any]] = []
-        endpoint_index = 0
-        for completed, (cell_south, cell_west, cell_north, cell_east) in enumerate(cells, 1):
-            query = _query(tags, cell_south, cell_west, cell_north, cell_east)
+        job.update(stage="collect", message="Scanning the search area for mapped businesses…", collection_queries=None, collection_completed=0, updated_at=time.time())
+
+        while pending:
+            south, west, north, east, depth = pending.pop(0)
             payload = None
-            attempts = 0
             last_error = None
-            while attempts < len(OVERPASS_ENDPOINTS):
-                endpoint = OVERPASS_ENDPOINTS[(endpoint_index + attempts) % len(OVERPASS_ENDPOINTS)]
+            for offset, endpoint in enumerate(OVERPASS_ENDPOINTS):
                 try:
-                    response = await client.post(endpoint, data={"data": query}, headers={"User-Agent": lf.UA, "Referer": "https://leadflowautomations.github.io/"})
+                    response = await client.post(endpoint, data={"data": _query(tags, south, west, north, east)}, headers={"User-Agent": lf.UA, "Referer": "https://leadflowautomations.github.io/"})
                     response.raise_for_status()
                     candidate = response.json()
                     if isinstance(candidate, dict) and "elements" in candidate:
                         payload = candidate
-                        endpoint_index = (endpoint_index + attempts) % len(OVERPASS_ENDPOINTS)
                         break
                 except Exception as exc:
                     last_error = str(exc)[:250]
-                    attempts += 1
                     job["errors"] += 1
                     job["last_error"] = f"Overpass: {last_error}"
-                    await asyncio.sleep(min(1.5, 0.25 * attempts))
-            if payload:
+                    await asyncio.sleep(min(1.25, 0.2 * (offset + 1)))
+
+            if payload is not None:
                 for element in payload.get("elements", []):
                     item = _row(lf, element, industry)
                     if item:
                         rows.append(item)
+            elif depth < 4:
+                mid_lat = (south + north) / 2
+                mid_lon = (west + east) / 2
+                pending.extend([
+                    (south, west, mid_lat, mid_lon, depth + 1),
+                    (south, mid_lon, mid_lat, east, depth + 1),
+                    (mid_lat, west, north, mid_lon, depth + 1),
+                    (mid_lat, mid_lon, north, east, depth + 1),
+                ])
             elif last_error:
-                print(f"Lead Flow Overpass cell {completed} failed: {last_error}", flush=True)
+                print(f"Lead Flow Overpass area exhausted: {last_error}", flush=True)
+
+            completed += 1
             unique = lf.dedupe(rows)
             job.update(collection_completed=completed, discovered=len(unique), updated_at=time.time())
+
         rows = lf.dedupe(rows)
         if rows:
-            job.update(discovered=len(rows), collection_completed=len(cells), updated_at=time.time())
+            job.update(discovered=len(rows), updated_at=time.time())
             return rows
-        print("Lead Flow exhaustive Overpass returned no rows; using Photon/Nominatim fallback", flush=True)
+        print("Lead Flow exhaustive discovery returned no rows; using fallback discovery", flush=True)
         return await fallback(city, industry, country, job)
