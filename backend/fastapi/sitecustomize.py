@@ -22,7 +22,7 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
     _around_re = re.compile(r"around:(\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
     _tag_re = re.compile(r'\["([^"\]]+)"="([^"\]]+)"\]')
     _name_re = re.compile(r'\["name"~"((?:\\.|[^"\\])*)",i\]')
-    _USER_AGENT = "LeadFlowResearch/2.4 (+https://leadflowautomations.github.io/)"
+    _USER_AGENT = "LeadFlowResearch/2.5 (+https://leadflowautomations.github.io/)"
 
     def _decode_regex(value: str) -> str:
         return re.sub(r"\\(.)", r"\1", unquote(value))
@@ -69,15 +69,20 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         radius_m = float(match.group(1))
         lat = float(match.group(2))
         lon = float(match.group(3))
-        common = {"lat": lat, "lon": lon, "limit": 100, "dedupe": 1}
+        bbox = _bbox(lat, lon, radius_m)
+        common = {"lat": lat, "lon": lon, "limit": 50, "dedupe": 0, "bbox": bbox}
         headers = {"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"}
 
         tag_match = _tag_re.search(query)
         if tag_match:
             key, value = tag_match.groups()
+            # Photon reverse search is optimized for nearest-place lookup and
+            # can under-return broad POI sets. Use forward search with bbox +
+            # OSM tag so discovery retrieves a candidate set across the city.
+            keyword = value.replace("_", " ")
             response = await client.get(
-                "https://photon.komoot.io/reverse",
-                params={**common, "radius": max(1, min(5000, radius_m / 1000.0)), "osm_tag": f"{key}:{value}"},
+                "https://photon.komoot.io/api/",
+                params={**common, "q": keyword, "osm_tag": f"{key}:{value}"},
                 headers=headers,
                 timeout=15,
             )
@@ -93,7 +98,6 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
                     "q": keyword,
                     "zoom": 12,
                     "location_bias_scale": 0.2,
-                    "bbox": _bbox(lat, lon, radius_m),
                 },
                 headers=headers,
                 timeout=15,
