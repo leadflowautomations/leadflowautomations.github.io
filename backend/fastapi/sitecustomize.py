@@ -12,10 +12,12 @@ is a bulk POI database.
 """
 
 import asyncio
+import builtins
 import json
 import math
 import os
 import re
+import sys
 import time
 from urllib.parse import unquote
 
@@ -25,15 +27,15 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
 
     _original_post = httpx.AsyncClient.post
     _around_re = re.compile(r"around:(\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
-    _tag_re = re.compile(r'\["([^"\]]+)"="([^"\]]+)"\]')
-    _name_re = re.compile(r'\["name"~"((?:\\.|[^"\\])*)",i\]')
+    _tag_re = re.compile(r'[\"([^\"\]]+)=\"([^\"\]]+)\"]')
+    _name_re = re.compile(r'[\"name\"~\"((?:\\\\.|[^\"\\\\])*)\",i\]')
     _USER_AGENT = "LeadFlowResearch/2.6 (+https://leadflowautomations.github.io/)"
     _nominatim_lock = asyncio.Lock()
     _last_nominatim_request = 0.0
     _NOMINATIM_MIN_INTERVAL = max(1.0, float(os.getenv("NOMINATIM_MIN_INTERVAL", "1.05")))
 
     def _decode_regex(value: str) -> str:
-        return re.sub(r"\\(.)", r"\1", unquote(value))
+        return re.sub(r"\\\\(.)", r"\1", unquote(value))
 
     def _bbox(lat: float, lon: float, radius_m: float) -> str:
         lat_delta = radius_m / 111_000.0
@@ -143,3 +145,34 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         )
 
     httpx.AsyncClient.post = _post
+
+
+# Lead Flow v3 currently computes score immediately before calling automation(),
+# but stores that score on the candidate only afterwards. Patch the imported
+# module at import time so the existing pipeline remains safe without changing
+# discovery or contact semantics. The wrapper derives the same evidence-based
+# score when the field is not present, then delegates to the original function.
+_original_import = builtins.__import__
+
+
+def _leadflow_import(name, globals=None, locals=None, fromlist=(), level=0):
+    module = _original_import(name, globals, locals, fromlist, level)
+    if name == "backend.fastapi.leadflow_v3":
+        target = sys.modules.get(name)
+        if target is not None and not getattr(target, "_leadflow_automation_hotfix", False):
+            original_automation = target.automation
+
+            def safe_automation(candidate):
+                if "score" not in candidate:
+                    score_value, _, _ = target.score(candidate, candidate.get("signals", {}))
+                    candidate = dict(candidate)
+                    candidate["score"] = score_value
+                return original_automation(candidate)
+
+            target.automation = safe_automation
+            target._leadflow_automation_hotfix = True
+            print("Lead Flow v3 automation hotfix active", flush=True)
+    return module
+
+
+builtins.__import__ = _leadflow_import
