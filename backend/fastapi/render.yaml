@@ -6,8 +6,15 @@ services:
     rootDir: backend/fastapi
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: HTTP_TIMEOUT
         value: "12"
       - key: MAX_DISCOVERY_RESULTS
-        value: "100"
+        value: "0"
+      - key: MAX_WEBSITE_ENRICH
+        value: "0"
+      - key: DISCOVERY_RADIUS_METERS
+        value: "30000"
+      - key: RESEARCH_CONCURRENCY
+        value: "8"
