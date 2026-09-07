@@ -2,17 +2,26 @@
 try:
     import asyncio
     import re
+    import json
     import httpx
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, urljoin
     from bs4 import BeautifulSoup
     from backend.fastapi import leadflow_v3 as _lf
     from backend.fastapi.exhaustive_discovery import discover_exhaustive
 
     def _safe_automation(item):
         score = int(item.get("score") or 0)
-        ready = bool(item.get("verified_business") and (item.get("phone") or item.get("email")))
+        signals = item.get("signals") or {}
+        verified = bool(item.get("verified_business"))
+        ready = bool(verified and (item.get("phone") or item.get("email") or signals.get("lead_form") or signals.get("booking")))
         action = "PRIORITY_OUTREACH" if score >= 75 and ready else "OUTREACH" if score >= 55 and ready else "RESEARCH_MORE" if score >= 35 else "NURTURE"
-        return {"action": action, "outreach_ready": ready, "next_action": "Contact using verified public channel" if ready else "Find an additional public contact source", "reason": "High confirmed opportunity gaps with verified business identity" if ready and score >= 55 else "Needs additional evidence before outreach"}
+        if item.get("phone") or item.get("email"):
+            next_action = "Contact using verified public phone or email"
+        elif signals.get("lead_form") or signals.get("booking"):
+            next_action = "Contact using the verified business website"
+        else:
+            next_action = "Find an additional public contact source"
+        return {"action": action, "outreach_ready": ready, "next_action": next_action, "reason": "High confirmed opportunity gaps with a verified public contact channel" if ready and score >= 55 else "Needs additional evidence before outreach"}
     _lf.automation = _safe_automation
 
     async def _photon_geocode(client, city, country):
@@ -57,12 +66,34 @@ try:
     _lf.geocode = _resilient_geocode
     _lf.nominatim_search = _resilient_search
 
+    _original_site_signals = _lf.site_signals
+    def _stronger_site_signals(url, html, status, seconds, name):
+        signals = _original_site_signals(url, html, status, seconds, name)
+        if signals.get("business_match"): return signals
+        soup = BeautifulSoup(html, "html.parser")
+        title = soup.title.get_text(" ", strip=True) if soup.title else ""
+        meta = soup.find("meta", attrs={"name": re.compile("description", re.I)})
+        desc = str(meta.get("content") or "") if meta else ""
+        host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+        name_tokens = {x for x in re.findall(r"[a-z0-9]+", name.lower()) if len(x) > 3}
+        host_tokens = set(re.findall(r"[a-z0-9]+", host.split(".")[0]))
+        page_tokens = set(re.findall(r"[a-z0-9]+", (title + " " + desc).lower()))
+        if len(name_tokens & host_tokens) >= 1 and len(name_tokens & page_tokens) >= 1:
+            signals["business_match"] = True
+            signals["identity_basis"] = "business name/domain/title correlation"
+        return signals
+    _lf.site_signals = _stronger_site_signals
+
     async def _broader_find_contacts(client, website, name, home_html):
         base_host = (urlparse(website).hostname or "").lower().removeprefix("www.")
-        pages = [website] + [website + "/" + path for path in ["contact", "contact-us", "contactus", "about", "about-us", "get-in-touch"]]
+        queue = [website] + [urljoin(website + "/", path) for path in ["contact", "contact-us", "contactus", "about", "about-us", "get-in-touch", "team", "agents", "our-team"]]
         found = []
         seen = set()
-        for url in pages:
+        scanned = set()
+        while queue and len(scanned) < 25:
+            url = queue.pop(0)
+            if url in scanned: continue
+            scanned.add(url)
             try:
                 if url == website and home_html:
                     html, final_url, status = home_html, website, 200
@@ -72,23 +103,48 @@ try:
                 if status >= 400: continue
                 final_host = (urlparse(final_url).hostname or "").lower().removeprefix("www.")
                 if base_host and final_host and final_host != base_host: continue
+                soup = BeautifulSoup(html, "html.parser")
+                for script in soup.find_all("script", attrs={"type": re.compile("ld\\+json", re.I)}):
+                    try:
+                        raw = json.loads(script.string or script.get_text() or "{}")
+                        for obj in raw if isinstance(raw, list) else [raw]:
+                            if not isinstance(obj, dict): continue
+                            for kind, value in (("email", obj.get("email")), ("phone", obj.get("telephone"))):
+                                cleaned = _lf.clean_email(value) if kind == "email" else _lf.clean_phone(value)
+                                if cleaned:
+                                    key = (kind, cleaned, final_url)
+                                    if key not in seen: seen.add(key); found.append(key)
+                    except Exception: pass
                 for email in _lf.extract_emails(html):
                     key = ("email", email, final_url)
-                    if key not in seen:
-                        seen.add(key); found.append(key)
-                soup = BeautifulSoup(html, "html.parser")
+                    if key not in seen: seen.add(key); found.append(key)
                 for anchor in soup.find_all("a", href=True):
                     href = str(anchor.get("href") or "")
-                    if href.lower().startswith("tel:"):
+                    low = href.lower()
+                    if low.startswith("tel:"):
                         phone = _lf.clean_phone(href[4:].split("?")[0])
                         if phone:
                             key = ("phone", phone, final_url)
-                            if key not in seen:
-                                seen.add(key); found.append(key)
+                            if key not in seen: seen.add(key); found.append(key)
+                    elif low.startswith("mailto:"):
+                        email = _lf.clean_email(href[7:].split("?")[0])
+                        if email:
+                            key = ("email", email, final_url)
+                            if key not in seen: seen.add(key); found.append(key)
+                    elif any(word in (anchor.get_text(" ", strip=True) + " " + href).lower() for word in ["contact", "about", "team", "agent", "staff"]):
+                        absolute = urljoin(final_url, href)
+                        if (urlparse(absolute).hostname or "").lower().removeprefix("www.") == base_host and absolute not in scanned and absolute not in queue:
+                            queue.append(absolute)
                 for phone in _lf.extract_phones(html):
                     key = ("phone", phone, final_url)
-                    if key not in seen:
-                        seen.add(key); found.append(key)
+                    if key not in seen: seen.add(key); found.append(key)
+                if url == website:
+                    try:
+                        r = await client.get(urljoin(website + "/", "sitemap.xml"), headers={"User-Agent": _lf.UA})
+                        if r.status_code < 400:
+                            for loc in re.findall(r"<loc>(.*?)</loc>", r.text, re.I):
+                                if any(k in loc.lower() for k in ["contact", "about", "team", "agent", "staff"]): queue.append(loc.strip())
+                    except Exception: pass
             except Exception:
                 continue
         return found
