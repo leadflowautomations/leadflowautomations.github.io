@@ -6,10 +6,12 @@ requests into Photon forward-search requests while preserving the FastAPI
 contract. Google Places is not used.
 """
 
+import asyncio
 import json
 import math
 import os
 import re
+import threading
 from urllib.parse import unquote
 
 
@@ -105,3 +107,16 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         return httpx.Response(200, headers={"content-type": "application/json"}, content=json.dumps(payload).encode(), request=httpx.Request("POST", str(url)))
 
     httpx.AsyncClient.post = _post
+
+    if os.getenv("LEADFLOW_PHOTON_SMOKE", "").strip() == "1":
+        def _smoke() -> None:
+            async def run() -> None:
+                query = '[out:json][timeout:55];(node["office"="estate_agent"](around:30000,25.7617,-80.1918);way["office"="estate_agent"](around:30000,25.7617,-80.1918);relation["office"="estate_agent"](around:30000,25.7617,-80.1918););out center tags;'
+                try:
+                    async with httpx.AsyncClient(timeout=20) as client:
+                        elements = await _photon_elements(client, query)
+                    print(f"LEADFLOW_PHOTON_ADAPTER_SMOKE_RESULT count={len(elements)}", flush=True)
+                except Exception as exc:
+                    print(f"LEADFLOW_PHOTON_ADAPTER_SMOKE_ERROR {exc!r}", flush=True)
+            asyncio.run(run())
+        threading.Thread(target=_smoke, name="leadflow-photon-smoke", daemon=True).start()
