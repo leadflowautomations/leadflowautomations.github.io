@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
+import sitecustomize  # noqa: F401
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
