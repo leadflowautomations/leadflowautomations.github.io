@@ -6,12 +6,10 @@ requests into bounded Nominatim POI searches while preserving the FastAPI
 contract. Google Places is not used.
 """
 
-import asyncio
 import json
 import math
 import os
 import re
-import threading
 from urllib.parse import unquote
 
 
@@ -103,27 +101,3 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         return httpx.Response(200, headers={"content-type": "application/json"}, content=json.dumps(payload).encode(), request=httpx.Request("POST", str(url)))
 
     httpx.AsyncClient.post = _post
-
-    if os.getenv("LEADFLOW_PHOTON_SMOKE", "").strip() == "1":
-        def _smoke() -> None:
-            async def run() -> None:
-                queries = [
-                    '[out:json];(node["office"="estate_agent"](around:30000,25.7617,-80.1918);way["office"="estate_agent"](around:30000,25.7617,-80.1918);relation["office"="estate_agent"](around:30000,25.7617,-80.1918););out center tags;',
-                    '[out:json];nwr["name"~"real estate",i](around:30000,25.7617,-80.1918);out center tags;',
-                    '[out:json];nwr["name"~"realty",i](around:30000,25.7617,-80.1918);out center tags;',
-                    '[out:json];nwr["name"~"realtor",i](around:30000,25.7617,-80.1918);out center tags;',
-                    '[out:json];nwr["name"~"properties",i](around:30000,25.7617,-80.1918);out center tags;',
-                    '[out:json];nwr["name"~"property management",i](around:30000,25.7617,-80.1918);out center tags;',
-                    '[out:json];nwr["name"~"commercial real estate",i](around:30000,25.7617,-80.1918);out center tags;',
-                    '[out:json];nwr["name"~"residential real estate",i](around:30000,25.7617,-80.1918);out center tags;',
-                ]
-                try:
-                    async with httpx.AsyncClient(timeout=25) as client:
-                        groups = await asyncio.gather(*(_photon_elements(client, q) for q in queries), return_exceptions=True)
-                    elements = [item for group in groups if isinstance(group, list) for item in group]
-                    unique = {(item.get("type"), item.get("id")): item for item in elements if item.get("id")}
-                    print(f"LEADFLOW_OSM_ADAPTER_SMOKE_RESULT raw={len(elements)} unique={len(unique)}", flush=True)
-                except Exception as exc:
-                    print(f"LEADFLOW_OSM_ADAPTER_SMOKE_ERROR {exc!r}", flush=True)
-            asyncio.run(run())
-        threading.Thread(target=_smoke, name="leadflow-osm-smoke", daemon=True).start()
