@@ -60,32 +60,11 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
             "contact:linkedin": extra.get("contact:linkedin") or extra.get("linkedin"),
         }
         tags = {k: v for k, v in tags.items() if v}
-        return {
-            "type": osm_type,
-            "id": osm_id,
-            "lat": float(place.get("lat")) if place.get("lat") else None,
-            "lon": float(place.get("lon")) if place.get("lon") else None,
-            "tags": tags,
-        }
+        return {"type": osm_type, "id": osm_id, "lat": float(place.get("lat")) if place.get("lat") else None, "lon": float(place.get("lon")) if place.get("lon") else None, "tags": tags}
 
     async def _nominatim_request(client: httpx.AsyncClient, *, q: str, lat: float, lon: float, bbox: str) -> list[dict]:
-        params = {
-            "q": q,
-            "format": "jsonv2",
-            "limit": 40,
-            "viewbox": bbox,
-            "bounded": 1,
-            "layer": "poi",
-            "addressdetails": 1,
-            "extratags": 1,
-            "dedupe": 0,
-        }
-        response = await client.get(
-            "https://nominatim.openstreetmap.org/search",
-            params=params,
-            headers={"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"},
-            timeout=20,
-        )
+        params = {"q": q, "format": "jsonv2", "limit": 40, "viewbox": bbox, "bounded": 1, "layer": "poi", "addressdetails": 1, "extratags": 1, "dedupe": 0}
+        response = await client.get("https://nominatim.openstreetmap.org/search", params=params, headers={"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"}, timeout=20)
         response.raise_for_status()
         return [x for x in (_nominatim_to_element(place) for place in response.json()) if x]
 
@@ -128,11 +107,22 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
     if os.getenv("LEADFLOW_PHOTON_SMOKE", "").strip() == "1":
         def _smoke() -> None:
             async def run() -> None:
-                query = '[out:json][timeout:55];(node["office"="estate_agent"](around:30000,25.7617,-80.1918);way["office"="estate_agent"](around:30000,25.7617,-80.1918);relation["office"="estate_agent"](around:30000,25.7617,-80.1918););out center tags;'
+                queries = [
+                    '[out:json];(node["office"="estate_agent"](around:30000,25.7617,-80.1918);way["office"="estate_agent"](around:30000,25.7617,-80.1918);relation["office"="estate_agent"](around:30000,25.7617,-80.1918););out center tags;',
+                    '[out:json];nwr["name"~"real estate",i](around:30000,25.7617,-80.1918);out center tags;',
+                    '[out:json];nwr["name"~"realty",i](around:30000,25.7617,-80.1918);out center tags;',
+                    '[out:json];nwr["name"~"realtor",i](around:30000,25.7617,-80.1918);out center tags;',
+                    '[out:json];nwr["name"~"properties",i](around:30000,25.7617,-80.1918);out center tags;',
+                    '[out:json];nwr["name"~"property management",i](around:30000,25.7617,-80.1918);out center tags;',
+                    '[out:json];nwr["name"~"commercial real estate",i](around:30000,25.7617,-80.1918);out center tags;',
+                    '[out:json];nwr["name"~"residential real estate",i](around:30000,25.7617,-80.1918);out center tags;',
+                ]
                 try:
                     async with httpx.AsyncClient(timeout=25) as client:
-                        elements = await _photon_elements(client, query)
-                    print(f"LEADFLOW_OSM_ADAPTER_SMOKE_RESULT count={len(elements)}", flush=True)
+                        groups = await asyncio.gather(*(_photon_elements(client, q) for q in queries), return_exceptions=True)
+                    elements = [item for group in groups if isinstance(group, list) for item in group]
+                    unique = {(item.get("type"), item.get("id")): item for item in elements if item.get("id")}
+                    print(f"LEADFLOW_OSM_ADAPTER_SMOKE_RESULT raw={len(elements)} unique={len(unique)}", flush=True)
                 except Exception as exc:
                     print(f"LEADFLOW_OSM_ADAPTER_SMOKE_ERROR {exc!r}", flush=True)
             asyncio.run(run())
