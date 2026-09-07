@@ -24,14 +24,10 @@ Start:
 uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
-Required environment variable:
+No Google Cloud account or API key is required.
 
-```text
-GOOGLE_API_KEY=<server-side Google Places API key>
-```
+## Discovery
 
-Never place the Google key in GitHub Pages frontend code or commit it to the repository.
+The hosted backend uses OpenStreetMap data through Nominatim and Overpass for location/category discovery, then performs server-side website inspection and conservative business-specific email extraction. It detects lead forms, booking, chat/AI, analytics, HTTPS, response time and website health, then produces an explainable 0-100 opportunity score.
 
-## Design
-
-The first backend version performs discovery through Google Places, server-side website inspection, conservative business-specific email extraction, automation-signal detection, and explainable 0-100 opportunity scoring. Discovery is intentionally isolated from the frontend so additional compliant sources can be added later without rebuilding the UI.
+Discovery is intentionally isolated from the frontend so additional compliant sources can be added later without rebuilding the UI.
