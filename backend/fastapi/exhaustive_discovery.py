@@ -26,7 +26,7 @@ INDUSTRY_TAGS = {
 
 def _query(tags: list[tuple[str, str]], south: float, west: float, north: float, east: float) -> str:
     clauses = "\n".join(f'nwr["{key}"="{value}"]({south},{west},{north},{east});' for key, value in tags)
-    return f'[out:json][timeout:45];({clauses});out center tags;'
+    return f'[out:json][timeout:30];({clauses});out center tags;'
 
 
 def _row(lf, element: dict[str, Any], industry: str) -> dict[str, Any] | None:
@@ -37,71 +37,72 @@ def _row(lf, element: dict[str, Any], industry: str) -> dict[str, Any] | None:
     center = element.get("center") or {}
     lat = element.get("lat") if element.get("lat") is not None else center.get("lat")
     lon = element.get("lon") if element.get("lon") is not None else center.get("lon")
-    address_parts = [
-        tags.get("addr:housenumber"), tags.get("addr:street"), tags.get("addr:city") or tags.get("addr:suburb"),
-        tags.get("addr:state"), tags.get("addr:postcode"), tags.get("addr:country"),
-    ]
+    address_parts = [tags.get("addr:housenumber"), tags.get("addr:street"), tags.get("addr:city") or tags.get("addr:suburb"), tags.get("addr:state"), tags.get("addr:postcode"), tags.get("addr:country")]
     address = ", ".join(str(x) for x in address_parts if x) or None
     website = tags.get("contact:website") or tags.get("website")
     phone = tags.get("contact:phone") or tags.get("phone")
     email = tags.get("contact:email") or tags.get("email")
-    return {
-        "source_id": f"osm:{element.get('type')}:{element.get('id')}",
-        "name": name,
-        "address": address,
-        "lat": lat,
-        "lon": lon,
-        "website": lf.clean_url(website),
-        "phone": lf.clean_phone(phone),
-        "email": lf.clean_email(email),
-        "source": "OpenStreetMap/Overpass",
-        "industry": industry,
-    }
+    return {"source_id": f"osm:{element.get('type')}:{element.get('id')}", "name": name, "address": address, "lat": lat, "lon": lon, "website": lf.clean_url(website), "phone": lf.clean_phone(phone), "email": lf.clean_email(email), "source": "OpenStreetMap/Overpass", "industry": industry}
 
 
 async def discover_exhaustive(lf, city: str, industry: str, country: str, job: dict[str, Any], fallback):
     tags = INDUSTRY_TAGS.get(industry.lower().strip())
     if not tags:
         return await fallback(city, industry, country, job)
-
-    async with httpx.AsyncClient(timeout=55.0) as client:
+    async with httpx.AsyncClient(timeout=40.0) as client:
         center = await lf.geocode(client, city, country)
         if not center:
             return []
         lat, lon = center
-        # Search a generous city/metro box instead of returning only the first ranked POIs.
         lat_span = 0.35
         lon_span = 0.45 if abs(lat) > 20 else 0.35
         south, north = lat - lat_span, lat + lat_span
         west, east = lon - lon_span, lon + lon_span
-        query = _query(tags, south, west, north, east)
-        job.update(stage="collect", message="Collecting all matching mapped businesses in the search area…", collection_queries=len(OVERPASS_ENDPOINTS), collection_completed=0, updated_at=time.time())
-        data = None
-        last_error = None
-        for index, endpoint in enumerate(OVERPASS_ENDPOINTS, 1):
-            try:
-                response = await client.post(endpoint, data={"data": query}, headers={"User-Agent": lf.UA, "Referer": "https://leadflowautomations.github.io/"})
-                response.raise_for_status()
-                payload = response.json()
-                if isinstance(payload, dict) and "elements" in payload:
-                    data = payload
-                    job.update(collection_completed=index, updated_at=time.time())
-                    break
-            except Exception as exc:
-                last_error = str(exc)[:250]
-                job["errors"] += 1
-                job["last_error"] = f"Overpass: {last_error}"
-                job.update(collection_completed=index, updated_at=time.time())
-                await asyncio.sleep(min(2.0, 0.5 * index))
-        if data is None:
-            print(f"Lead Flow exhaustive Overpass failed; using Photon/Nominatim fallback: {last_error}", flush=True)
-            return await fallback(city, industry, country, job)
-
-        rows = []
-        for element in data.get("elements", []):
-            item = _row(lf, element, industry)
-            if item:
-                rows.append(item)
+        grid_rows, grid_cols = 5, 5
+        cells = []
+        for gy in range(grid_rows):
+            cell_south = south + (north - south) * gy / grid_rows
+            cell_north = south + (north - south) * (gy + 1) / grid_rows
+            for gx in range(grid_cols):
+                cell_west = west + (east - west) * gx / grid_cols
+                cell_east = west + (east - west) * (gx + 1) / grid_cols
+                cells.append((cell_south, cell_west, cell_north, cell_east))
+        job.update(stage="collect", message=f"Collecting mapped businesses across {len(cells)} search areas…", collection_queries=len(cells), collection_completed=0, updated_at=time.time())
+        rows: list[dict[str, Any]] = []
+        endpoint_index = 0
+        for completed, (cell_south, cell_west, cell_north, cell_east) in enumerate(cells, 1):
+            query = _query(tags, cell_south, cell_west, cell_north, cell_east)
+            payload = None
+            attempts = 0
+            last_error = None
+            while attempts < len(OVERPASS_ENDPOINTS):
+                endpoint = OVERPASS_ENDPOINTS[(endpoint_index + attempts) % len(OVERPASS_ENDPOINTS)]
+                try:
+                    response = await client.post(endpoint, data={"data": query}, headers={"User-Agent": lf.UA, "Referer": "https://leadflowautomations.github.io/"})
+                    response.raise_for_status()
+                    candidate = response.json()
+                    if isinstance(candidate, dict) and "elements" in candidate:
+                        payload = candidate
+                        endpoint_index = (endpoint_index + attempts) % len(OVERPASS_ENDPOINTS)
+                        break
+                except Exception as exc:
+                    last_error = str(exc)[:250]
+                    attempts += 1
+                    job["errors"] += 1
+                    job["last_error"] = f"Overpass: {last_error}"
+                    await asyncio.sleep(min(1.5, 0.25 * attempts))
+            if payload:
+                for element in payload.get("elements", []):
+                    item = _row(lf, element, industry)
+                    if item:
+                        rows.append(item)
+            elif last_error:
+                print(f"Lead Flow Overpass cell {completed} failed: {last_error}", flush=True)
+            unique = lf.dedupe(rows)
+            job.update(collection_completed=completed, discovered=len(unique), updated_at=time.time())
         rows = lf.dedupe(rows)
-        job.update(discovered=len(rows), collection_completed=len(OVERPASS_ENDPOINTS), updated_at=time.time())
-        return rows
+        if rows:
+            job.update(discovered=len(rows), collection_completed=len(cells), updated_at=time.time())
+            return rows
+        print("Lead Flow exhaustive Overpass returned no rows; using Photon/Nominatim fallback", flush=True)
+        return await fallback(city, industry, country, job)
