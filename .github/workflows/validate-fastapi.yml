@@ -30,4 +30,8 @@ jobs:
       - name: Import FastAPI app
         run: python -c "import main; assert main.app.title == 'Lead Flow Intelligence API'; print('FASTAPI_IMPORT_VALIDATION=PASS')"
       - name: Verify required routes
-        run: python -c "import main; routes={r.path for r in main.app.routes}; required={'/','/health','/scan','/docs'}; assert required <= routes, (routes, required); print('FASTAPI_ROUTE_VALIDATION=PASS')"
+        run: python -c "import main; routes={r.path for r in main.app.routes}; required={'/','/health','/scan','/research-jobs','/research-jobs/{job_id}','/docs'}; assert required <= routes, (routes, required); print('FASTAPI_ROUTE_VALIDATION=PASS')"
+      - name: Verify real-estate discovery mapping
+        run: python -c "import main; c=main.industry_config('Miami real estate' if False else 'real estate'); assert ('office','estate_agent') in c['osm']; assert ('office','property_management') in c['osm']; assert ('shop','estate_agent') in c['osm']; assert c['queries']; assert main.MAX_DISCOVERY_RESULTS == 0; assert main.MAX_WEBSITE_ENRICH == 0; print('DISCOVERY_CONFIG_VALIDATION=PASS')"
+      - name: Verify research job schema
+        run: python -c "import main; assert main.RESEARCH_CONCURRENCY >= 1; assert main.DISCOVERY_RADIUS_METERS >= 5000; print('RESEARCH_JOB_CONFIG_VALIDATION=PASS')"
