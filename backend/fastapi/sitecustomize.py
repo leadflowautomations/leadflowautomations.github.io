@@ -8,6 +8,8 @@ failure observed on the Render instance.
 Photon is an OSM-derived provider; Google Places is not used.
 """
 
+import json
+import math
 import os
 import re
 from urllib.parse import unquote
@@ -20,13 +22,14 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
     _around_re = re.compile(r"around:(\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
     _tag_re = re.compile(r'\["([^"\]]+)"="([^"\]]+)"\]')
     _name_re = re.compile(r'\["name"~"((?:\\.|[^"\\])*)",i\]')
+    _USER_AGENT = "LeadFlowResearch/2.4 (+https://leadflowautomations.github.io/)"
 
     def _decode_regex(value: str) -> str:
         return re.sub(r"\\(.)", r"\1", unquote(value))
 
     def _bbox(lat: float, lon: float, radius_m: float) -> str:
         lat_delta = radius_m / 111_000.0
-        lon_scale = max(0.25, abs(__import__("math").cos(__import__("math").radians(lat))))
+        lon_scale = max(0.25, abs(math.cos(math.radians(lat))))
         lon_delta = radius_m / (111_000.0 * lon_scale)
         return f"{lon - lon_delta},{lat - lat_delta},{lon + lon_delta},{lat + lat_delta}"
 
@@ -57,13 +60,7 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         }
         tags = {k: v for k, v in tags.items() if v}
         osm_type = {"N": "node", "W": "way", "R": "relation"}.get(properties.get("osm_type"), "node")
-        return {
-            "type": osm_type,
-            "id": properties.get("osm_id"),
-            "lat": coordinates[1],
-            "lon": coordinates[0],
-            "tags": tags,
-        }
+        return {"type": osm_type, "id": properties.get("osm_id"), "lat": coordinates[1], "lon": coordinates[0], "tags": tags}
 
     async def _photon_elements(client: httpx.AsyncClient, query: str) -> list[dict]:
         match = _around_re.search(query)
@@ -72,20 +69,16 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         radius_m = float(match.group(1))
         lat = float(match.group(2))
         lon = float(match.group(3))
-        base = {
-            "lat": lat,
-            "lon": lon,
-            "limit": 100,
-            "dedupe": 1,
-            "headers": {"User-Agent": "LeadFlowResearch/2.4 (+https://leadflowautomations.github.io/)"},
-        }
+        common = {"lat": lat, "lon": lon, "limit": 100, "dedupe": 1}
+        headers = {"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"}
 
         tag_match = _tag_re.search(query)
         if tag_match:
             key, value = tag_match.groups()
             response = await client.get(
                 "https://photon.komoot.io/reverse",
-                params={**base, "radius": max(1, min(5000, radius_m / 1000.0)), "osm_tag": f"{key}:{value}"},
+                params={**common, "radius": max(1, min(5000, radius_m / 1000.0)), "osm_tag": f"{key}:{value}"},
+                headers=headers,
                 timeout=15,
             )
         else:
@@ -96,12 +89,13 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
             response = await client.get(
                 "https://photon.komoot.io/api/",
                 params={
-                    **base,
+                    **common,
                     "q": keyword,
                     "zoom": 12,
                     "location_bias_scale": 0.2,
                     "bbox": _bbox(lat, lon, radius_m),
                 },
+                headers=headers,
                 timeout=15,
             )
         response.raise_for_status()
@@ -117,9 +111,11 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         if not isinstance(query, str):
             return await _original_post(self, url, *args, **kwargs)
         elements = await _photon_elements(self, query)
+        payload = {"version": 0.6, "generator": "LeadFlow Photon OSM adapter", "elements": elements}
         return httpx.Response(
             status_code=200,
-            json={"version": 0.6, "generator": "LeadFlow Photon OSM adapter", "elements": elements},
+            headers={"content-type": "application/json"},
+            content=json.dumps(payload).encode("utf-8"),
             request=httpx.Request("POST", str(url)),
         )
 
