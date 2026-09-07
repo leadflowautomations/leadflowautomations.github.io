@@ -27,15 +27,15 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
 
     _original_post = httpx.AsyncClient.post
     _around_re = re.compile(r"around:(\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
-    _tag_re = re.compile(r'[\"([^\"\]]+)=\"([^\"\]]+)\"]')
-    _name_re = re.compile(r'[\"name\"~\"((?:\\\\.|[^\"\\\\])*)\",i\]')
+    _tag_re = re.compile(r'\["([^"\]]+)"="([^"\]]+)"\]')
+    _name_re = re.compile(r'\["name"~"((?:\\.|[^"\\])*)",i\]')
     _USER_AGENT = "LeadFlowResearch/2.6 (+https://leadflowautomations.github.io/)"
     _nominatim_lock = asyncio.Lock()
     _last_nominatim_request = 0.0
     _NOMINATIM_MIN_INTERVAL = max(1.0, float(os.getenv("NOMINATIM_MIN_INTERVAL", "1.05")))
 
     def _decode_regex(value: str) -> str:
-        return re.sub(r"\\\\(.)", r"\1", unquote(value))
+        return re.sub(r"\\(.)", r"\1", unquote(value))
 
     def _bbox(lat: float, lon: float, radius_m: float) -> str:
         lat_delta = radius_m / 111_000.0
