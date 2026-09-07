@@ -24,6 +24,18 @@ try:
         return {"action": action, "outreach_ready": ready, "next_action": next_action, "reason": "High confirmed opportunity gaps with a verified public contact channel" if ready and score >= 55 else "Needs additional evidence before outreach"}
     _lf.automation = _safe_automation
 
+    async def _open_meteo_geocode(client, city, country):
+        r = await client.get("https://geocoding-api.open-meteo.com/v1/search", params={"name": city, "count": 10, "language": "en", "format": "json"}, headers={"User-Agent": _lf.UA})
+        r.raise_for_status()
+        results = r.json().get("results", [])
+        country_low = country.lower().strip()
+        for item in results:
+            if str(item.get("country", "")).lower() == country_low or str(item.get("country_code", "")).lower() == country_low:
+                return (float(item["latitude"]), float(item["longitude"]))
+        if results:
+            return (float(results[0]["latitude"]), float(results[0]["longitude"]))
+        return None
+
     async def _photon_geocode(client, city, country):
         r = await client.get("https://photon.komoot.io/api/", params={"q": f"{city}, {country}", "limit": 1}, headers={"User-Agent": _lf.UA})
         r.raise_for_status()
@@ -53,6 +65,10 @@ try:
     _original_geocode = _lf.geocode
     _original_search = _lf.nominatim_search
     async def _resilient_geocode(client, city, country):
+        try:
+            result = await _open_meteo_geocode(client, city, country)
+            if result: return result
+        except Exception as exc: print(f"Lead Flow Open-Meteo geocode fallback: {exc}", flush=True)
         try:
             result = await _photon_geocode(client, city, country)
             if result: return result
