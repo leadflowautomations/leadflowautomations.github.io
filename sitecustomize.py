@@ -1,4 +1,4 @@
-"""Runtime compatibility patch for Lead Flow v3.
+"""Runtime bootstrap for Lead Flow v3.
 Loaded automatically by Python before uvicorn imports the ASGI module.
 """
 try:
@@ -23,5 +23,13 @@ try:
         }
 
     _lf.automation = _safe_automation
-except Exception:
-    pass
+
+    from backend.fastapi.job_store import PersistentJobs
+
+    _lf.JOBS = PersistentJobs()
+    print(
+        f"Lead Flow durable job store active: {getattr(_lf.JOBS, 'persistent', False)}",
+        flush=True,
+    )
+except Exception as exc:
+    print(f"Lead Flow runtime bootstrap unavailable: {exc}", flush=True)
