@@ -4,6 +4,7 @@ try:
     import re
     import httpx
     from backend.fastapi import leadflow_v3 as _lf
+    from backend.fastapi.exhaustive_discovery import discover_exhaustive
 
     def _safe_automation(item):
         score = int(item.get("score") or 0)
@@ -96,7 +97,7 @@ try:
 
     _original_discover = _lf.discover
     async def _discover_with_contacts(city, industry, country, job):
-        rows = await _original_discover(city, industry, country, job)
+        rows = await discover_exhaustive(_lf, city, industry, country, job, _original_discover)
         if rows:
             async with httpx.AsyncClient(timeout=_lf.TIMEOUT) as client:
                 rows = await _enrich_contacts(client, rows)
