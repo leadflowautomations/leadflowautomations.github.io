@@ -62,64 +62,37 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         return {"type": osm_type, "id": properties.get("osm_id"), "lat": coordinates[1], "lon": coordinates[0], "tags": tags}
 
     async def _photon_request(client: httpx.AsyncClient, *, q: str, lat: float, lon: float, bbox: str, osm_tag: str | None = None) -> list[dict]:
-        params = {
-            "q": q,
-            "lat": lat,
-            "lon": lon,
-            "limit": 50,
-            "dedupe": 0,
-            "bbox": bbox,
-            "location_bias_scale": 0.1,
-        }
+        params = {"q": q, "lat": lat, "lon": lon, "limit": 50, "dedupe": 0, "bbox": bbox, "location_bias_scale": 0.1}
         if osm_tag:
             params["osm_tag"] = osm_tag
-        response = await client.get(
-            "https://photon.komoot.io/api/",
-            params=params,
-            headers={"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"},
-            timeout=15,
-        )
+        response = await client.get("https://photon.komoot.io/api/", params=params, headers={"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"}, timeout=15)
         response.raise_for_status()
-        payload = response.json()
-        return [x for x in (_feature_to_element(feature) for feature in payload.get("features", [])) if x]
+        return [x for x in (_feature_to_element(feature) for feature in response.json().get("features", [])) if x]
 
     async def _photon_elements(client: httpx.AsyncClient, query: str) -> list[dict]:
         match = _around_re.search(query)
         if not match:
             return []
-        radius_m = float(match.group(1))
-        lat = float(match.group(2))
-        lon = float(match.group(3))
+        radius_m, lat, lon = float(match.group(1)), float(match.group(2)), float(match.group(3))
         bbox = _bbox(lat, lon, radius_m)
-
         tag_match = _tag_re.search(query)
         if tag_match:
             key, value = tag_match.groups()
-            # Photon is primarily a forward geocoder, not a POI database. A
-            # tag-only search is therefore not enough: q must be meaningful.
-            # Search the tag's human-readable value and constrain it by the OSM
-            # tag. If the tag is not indexed on the public instance, fall back
-            # to the same business phrase without the tag filter.
             keyword = value.replace("_", " ")
             results = await _photon_request(client, q=keyword, lat=lat, lon=lon, bbox=bbox, osm_tag=f"{key}:{value}")
             if not results:
                 results = await _photon_request(client, q=keyword, lat=lat, lon=lon, bbox=bbox)
             return results
-
         name_match = _name_re.search(query)
         if not name_match:
             return []
         keyword = _decode_regex(name_match.group(1)).strip()
-        if not keyword:
-            return []
-        return await _photon_request(client, q=keyword, lat=lat, lon=lon, bbox=bbox)
+        return await _photon_request(client, q=keyword, lat=lat, lon=lon, bbox=bbox) if keyword else []
 
     async def _post(self, url, *args, **kwargs):
         if "overpass" not in str(url).lower():
             return await _original_post(self, url, *args, **kwargs)
-        query = kwargs.get("data")
-        if query is None and args:
-            query = args[0]
+        query = kwargs.get("data") if kwargs.get("data") is not None else (args[0] if args else None)
         if not isinstance(query, str):
             return await _original_post(self, url, *args, **kwargs)
         try:
@@ -129,11 +102,17 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
             print(f"Photon discovery provider failed: {exc}")
             elements = []
         payload = {"version": 0.6, "generator": "LeadFlow Photon OSM adapter", "elements": elements}
-        return httpx.Response(
-            status_code=200,
-            headers={"content-type": "application/json"},
-            content=json.dumps(payload).encode("utf-8"),
-            request=httpx.Request("POST", str(url)),
-        )
+        return httpx.Response(200, headers={"content-type": "application/json"}, content=json.dumps(payload).encode(), request=httpx.Request("POST", str(url)))
 
     httpx.AsyncClient.post = _post
+
+    if os.getenv("LEADFLOW_PHOTON_SMOKE", "").strip() == "1":
+        try:
+            with httpx.Client(timeout=20) as probe:
+                response = probe.get("https://photon.komoot.io/api/", params={"q": "estate agent", "osm_tag": "office:estate_agent", "bbox": "-80.45,25.65,-80.05,25.95", "limit": 50, "dedupe": 0}, headers={"User-Agent": _USER_AGENT})
+                response.raise_for_status()
+                features = response.json().get("features", [])
+                named = [f for f in features if (f.get("properties") or {}).get("name")]
+                print(f"LEADFLOW_PHOTON_SMOKE_RESULT count={len(named)} total_features={len(features)}")
+        except Exception as exc:
+            print(f"LEADFLOW_PHOTON_SMOKE_ERROR {exc!r}")
