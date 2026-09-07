@@ -1,11 +1,9 @@
 """Render-safe OSM discovery adapter.
 
-When LEADFLOW_DISCOVERY_PROVIDER=photon, translate the existing Overpass POST
-queries into Photon OSM searches. This keeps the discovery contract unchanged
-for the FastAPI application while avoiding the outbound Overpass networking
-failure observed on the Render instance.
-
-Photon is an OSM-derived provider; Google Places is not used.
+Render cannot reliably reach the configured Overpass endpoints, so when the
+Photon provider is enabled this module translates the existing Overpass
+requests into Photon forward-search requests while preserving the FastAPI
+contract. Google Places is not used.
 """
 
 import json
@@ -37,11 +35,12 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         properties = feature.get("properties") or {}
         geometry = feature.get("geometry") or {}
         coordinates = geometry.get("coordinates") or []
-        if len(coordinates) < 2 or not properties.get("name"):
+        name = (properties.get("name") or "").strip()
+        if len(coordinates) < 2 or not name:
             return None
         extra = properties.get("extra") or {}
         tags = {
-            "name": properties.get("name"),
+            "name": name,
             "addr:housenumber": properties.get("housenumber"),
             "addr:street": properties.get("street"),
             "addr:city": properties.get("city"),
@@ -62,6 +61,28 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         osm_type = {"N": "node", "W": "way", "R": "relation"}.get(properties.get("osm_type"), "node")
         return {"type": osm_type, "id": properties.get("osm_id"), "lat": coordinates[1], "lon": coordinates[0], "tags": tags}
 
+    async def _photon_request(client: httpx.AsyncClient, *, q: str, lat: float, lon: float, bbox: str, osm_tag: str | None = None) -> list[dict]:
+        params = {
+            "q": q,
+            "lat": lat,
+            "lon": lon,
+            "limit": 50,
+            "dedupe": 0,
+            "bbox": bbox,
+            "location_bias_scale": 0.1,
+        }
+        if osm_tag:
+            params["osm_tag"] = osm_tag
+        response = await client.get(
+            "https://photon.komoot.io/api/",
+            params=params,
+            headers={"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return [x for x in (_feature_to_element(feature) for feature in payload.get("features", [])) if x]
+
     async def _photon_elements(client: httpx.AsyncClient, query: str) -> list[dict]:
         match = _around_re.search(query)
         if not match:
@@ -70,41 +91,28 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
         lat = float(match.group(2))
         lon = float(match.group(3))
         bbox = _bbox(lat, lon, radius_m)
-        common = {"lat": lat, "lon": lon, "limit": 50, "dedupe": 0, "bbox": bbox}
-        headers = {"User-Agent": _USER_AGENT, "Referer": "https://leadflowautomations.github.io/"}
 
         tag_match = _tag_re.search(query)
         if tag_match:
             key, value = tag_match.groups()
-            # Photon reverse search is optimized for nearest-place lookup and
-            # can under-return broad POI sets. Use forward search with bbox +
-            # OSM tag so discovery retrieves a candidate set across the city.
+            # Photon is primarily a forward geocoder, not a POI database. A
+            # tag-only search is therefore not enough: q must be meaningful.
+            # Search the tag's human-readable value and constrain it by the OSM
+            # tag. If the tag is not indexed on the public instance, fall back
+            # to the same business phrase without the tag filter.
             keyword = value.replace("_", " ")
-            response = await client.get(
-                "https://photon.komoot.io/api/",
-                params={**common, "q": keyword, "osm_tag": f"{key}:{value}"},
-                headers=headers,
-                timeout=15,
-            )
-        else:
-            name_match = _name_re.search(query)
-            if not name_match:
-                return []
-            keyword = _decode_regex(name_match.group(1))
-            response = await client.get(
-                "https://photon.komoot.io/api/",
-                params={
-                    **common,
-                    "q": keyword,
-                    "zoom": 12,
-                    "location_bias_scale": 0.2,
-                },
-                headers=headers,
-                timeout=15,
-            )
-        response.raise_for_status()
-        payload = response.json()
-        return [x for x in (_feature_to_element(feature) for feature in payload.get("features", [])) if x]
+            results = await _photon_request(client, q=keyword, lat=lat, lon=lon, bbox=bbox, osm_tag=f"{key}:{value}")
+            if not results:
+                results = await _photon_request(client, q=keyword, lat=lat, lon=lon, bbox=bbox)
+            return results
+
+        name_match = _name_re.search(query)
+        if not name_match:
+            return []
+        keyword = _decode_regex(name_match.group(1)).strip()
+        if not keyword:
+            return []
+        return await _photon_request(client, q=keyword, lat=lat, lon=lon, bbox=bbox)
 
     async def _post(self, url, *args, **kwargs):
         if "overpass" not in str(url).lower():
@@ -114,7 +122,12 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
             query = args[0]
         if not isinstance(query, str):
             return await _original_post(self, url, *args, **kwargs)
-        elements = await _photon_elements(self, query)
+        try:
+            elements = await _photon_elements(self, query)
+            print(f"Photon discovery adapter returned {len(elements)} elements")
+        except Exception as exc:
+            print(f"Photon discovery provider failed: {exc}")
+            elements = []
         payload = {"version": 0.6, "generator": "LeadFlow Photon OSM adapter", "elements": elements}
         return httpx.Response(
             status_code=200,
