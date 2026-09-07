@@ -3,6 +3,8 @@ try:
     import asyncio
     import re
     import httpx
+    from urllib.parse import urlparse
+    from bs4 import BeautifulSoup
     from backend.fastapi import leadflow_v3 as _lf
     from backend.fastapi.exhaustive_discovery import discover_exhaustive
 
@@ -34,19 +36,9 @@ try:
             c = (feature.get("geometry") or {}).get("coordinates") or []
             name = (p.get("name") or "").strip()
             osm_key = str(p.get("osm_key") or "").lower()
-            if not name or osm_key in rejected_keys or osm_key not in business_keys:
-                continue
+            if not name or osm_key in rejected_keys or osm_key not in business_keys: continue
             extra = p.get("extra") or {}
-            converted.append({
-                "osm_type": {"N":"node","W":"way","R":"relation","node":"node","way":"way","relation":"relation"}.get(str(p.get("osm_type") or ""), p.get("osm_type")),
-                "osm_id": p.get("osm_id"),
-                "name": name,
-                "display_name": ", ".join(str(p.get(k)) for k in ("name","street","city","state","postcode","country") if p.get(k)),
-                "lat": str(c[1]) if len(c) >= 2 else None,
-                "lon": str(c[0]) if len(c) >= 2 else None,
-                "address": {"house_number":p.get("housenumber"),"road":p.get("street"),"city":p.get("city") or p.get("locality"),"state":p.get("state"),"postcode":p.get("postcode")},
-                "extratags": extra,
-            })
+            converted.append({"osm_type": {"N":"node","W":"way","R":"relation","node":"node","way":"way","relation":"relation"}.get(str(p.get("osm_type") or ""), p.get("osm_type")), "osm_id": p.get("osm_id"), "name": name, "display_name": ", ".join(str(p.get(k)) for k in ("name","street","city","state","postcode","country") if p.get(k)), "lat": str(c[1]) if len(c)>=2 else None, "lon": str(c[0]) if len(c)>=2 else None, "address": {"house_number":p.get("housenumber"),"road":p.get("street"),"city":p.get("city") or p.get("locality"),"state":p.get("state"),"postcode":p.get("postcode")}, "extratags": extra})
         return converted
 
     _original_geocode = _lf.geocode
@@ -55,8 +47,7 @@ try:
         try:
             result = await _photon_geocode(client, city, country)
             if result: return result
-        except Exception as exc:
-            print(f"Lead Flow Photon geocode fallback: {exc}", flush=True)
+        except Exception as exc: print(f"Lead Flow Photon geocode fallback: {exc}", flush=True)
         return await _original_geocode(client, city, country)
     async def _resilient_search(client, query, lat, lon, delta):
         try: return await _photon_search(client, query, lat, lon, delta)
@@ -66,12 +57,48 @@ try:
     _lf.geocode = _resilient_geocode
     _lf.nominatim_search = _resilient_search
 
+    async def _broader_find_contacts(client, website, name, home_html):
+        base_host = (urlparse(website).hostname or "").lower().removeprefix("www.")
+        pages = [website] + [website + "/" + path for path in ["contact", "contact-us", "contactus", "about", "about-us", "get-in-touch"]]
+        found = []
+        seen = set()
+        for url in pages:
+            try:
+                if url == website and home_html:
+                    html, final_url, status = home_html, website, 200
+                else:
+                    response = await client.get(url, follow_redirects=True, headers={"User-Agent": _lf.UA})
+                    html, final_url, status = response.text[:1_500_000], str(response.url), response.status_code
+                if status >= 400: continue
+                final_host = (urlparse(final_url).hostname or "").lower().removeprefix("www.")
+                if base_host and final_host and final_host != base_host: continue
+                for email in _lf.extract_emails(html):
+                    key = ("email", email, final_url)
+                    if key not in seen:
+                        seen.add(key); found.append(key)
+                soup = BeautifulSoup(html, "html.parser")
+                for anchor in soup.find_all("a", href=True):
+                    href = str(anchor.get("href") or "")
+                    if href.lower().startswith("tel:"):
+                        phone = _lf.clean_phone(href[4:].split("?")[0])
+                        if phone:
+                            key = ("phone", phone, final_url)
+                            if key not in seen:
+                                seen.add(key); found.append(key)
+                for phone in _lf.extract_phones(html):
+                    key = ("phone", phone, final_url)
+                    if key not in seen:
+                        seen.add(key); found.append(key)
+            except Exception:
+                continue
+        return found
+    _lf.find_contacts = _broader_find_contacts
+
     async def _enrich_contacts(client, rows):
         wanted = {}
         for row in rows:
             m = re.match(r"osm:(node|way|relation):(.+)$", str(row.get("source_id") or ""))
-            if m:
-                wanted[{"node":"N","way":"W","relation":"R"}[m.group(1)] + m.group(2)] = row
+            if m: wanted[{"node":"N","way":"W","relation":"R"}[m.group(1)] + m.group(2)] = row
         if not wanted: return rows
         keys = list(wanted)
         for start in range(0, len(keys), 50):
@@ -91,16 +118,14 @@ try:
                     if website and not row.get("website"): row["website"] = _lf.clean_url(website)
                     if phone and not row.get("phone"): row["phone"] = _lf.clean_phone(phone)
                     if email and not row.get("email"): row["email"] = _lf.clean_email(email)
-            except Exception as exc:
-                print(f"Lead Flow OSM contact enrichment skipped: {exc}", flush=True)
+            except Exception as exc: print(f"Lead Flow OSM contact enrichment skipped: {exc}", flush=True)
         return rows
 
     _original_discover = _lf.discover
     async def _discover_with_contacts(city, industry, country, job):
         rows = await discover_exhaustive(_lf, city, industry, country, job, _original_discover)
         if rows:
-            async with httpx.AsyncClient(timeout=_lf.TIMEOUT) as client:
-                rows = await _enrich_contacts(client, rows)
+            async with httpx.AsyncClient(timeout=_lf.TIMEOUT) as client: rows = await _enrich_contacts(client, rows)
         return rows
     _lf.discover = _discover_with_contacts
 
