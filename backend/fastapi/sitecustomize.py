@@ -1,4 +1,4 @@
-"""Render-safe OSM discovery adapter.
+"""Render-safe OSM discovery adapter and Lead Flow runtime bootstrap."""
 
 Render cannot reliably reach the configured Overpass endpoints, so when the
 Photon provider is enabled this module translates the existing Overpass
@@ -147,11 +147,7 @@ if os.getenv("LEADFLOW_DISCOVERY_PROVIDER", "").strip().lower() == "photon":
     httpx.AsyncClient.post = _post
 
 
-# Lead Flow v3 currently computes score immediately before calling automation(),
-# but stores that score on the candidate only afterwards. Patch the imported
-# module at import time so the existing pipeline remains safe without changing
-# discovery or contact semantics. The wrapper derives the same evidence-based
-# score when the field is not present, then delegates to the original function.
+# Lead Flow v3 automation safety patch.
 _original_import = builtins.__import__
 
 
@@ -159,7 +155,7 @@ def _leadflow_import(name, globals=None, locals=None, fromlist=(), level=0):
     module = _original_import(name, globals, locals, fromlist, level)
     if name == "backend.fastapi.leadflow_v3":
         target = sys.modules.get(name)
-        if target is not None and not getattr(target, "_leadflow_automation_hotfix", False):
+        if target is not None and not getattr(target, "_leadflow_runtime_bootstrapped", False):
             original_automation = target.automation
 
             def safe_automation(candidate):
@@ -170,9 +166,37 @@ def _leadflow_import(name, globals=None, locals=None, fromlist=(), level=0):
                 return original_automation(candidate)
 
             target.automation = safe_automation
-            target._leadflow_automation_hotfix = True
+            target._leadflow_runtime_bootstrapped = True
             print("Lead Flow v3 automation hotfix active", flush=True)
     return module
 
 
 builtins.__import__ = _leadflow_import
+
+
+# Durable job bootstrap. The active Render service can keep its existing start
+# command; when DATABASE_URL is supplied, JOBS transparently becomes a Postgres-
+# backed mapping. Without DATABASE_URL the normal in-memory behavior remains.
+_persistence_import = builtins.__import__
+
+
+def _leadflow_persistence_import(name, globals=None, locals=None, fromlist=(), level=0):
+    module = _persistence_import(name, globals, locals, fromlist, level)
+    if name == "backend.fastapi.leadflow_v3":
+        target = sys.modules.get(name)
+        if target is not None and not getattr(target, "_leadflow_persistence_bootstrapped", False):
+            try:
+                from backend.fastapi.job_store import PersistentJobs
+
+                target.JOBS = PersistentJobs()
+                target._leadflow_persistence_bootstrapped = True
+                print(
+                    f"Lead Flow durable job store active: {getattr(target.JOBS, 'persistent', False)}",
+                    flush=True,
+                )
+            except Exception as exc:
+                print(f"Lead Flow durable job store unavailable: {exc}", flush=True)
+    return module
+
+
+builtins.__import__ = _leadflow_persistence_import
