@@ -1,0 +1,33 @@
+name: Validate Lead Flow FastAPI
+
+on:
+  push:
+    branches: [step-7-automate]
+    paths:
+      - 'backend/fastapi/**'
+      - '.github/workflows/validate-fastapi.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/fastapi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: backend/fastapi/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile backend
+        run: python -m compileall -q .
+      - name: Import FastAPI app
+        run: python -c "import main; assert main.app.title == 'Lead Flow Intelligence API'; print('FASTAPI_IMPORT_VALIDATION=PASS')"
+      - name: Verify required routes
+        run: python -c "import main; routes={r.path for r in main.app.routes}; required={'/','/health','/scan','/docs'}; assert required <= routes, (routes, required); print('FASTAPI_ROUTE_VALIDATION=PASS')"
