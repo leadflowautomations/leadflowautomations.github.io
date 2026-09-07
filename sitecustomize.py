@@ -1,8 +1,10 @@
-"""Runtime bootstrap for Lead Flow v3.
-Loaded automatically by Python before uvicorn imports the ASGI module.
+"""Lead Flow runtime hardening.
+Loads before uvicorn so the complete pipeline gets resilient discovery,
+contact enrichment, safe automation and durable job storage.
 """
 try:
     import asyncio
+    import re
 
     from backend.fastapi import leadflow_v3 as _lf
 
@@ -99,12 +101,78 @@ try:
     _lf.geocode = _resilient_geocode
     _lf.nominatim_search = _resilient_search
 
-    from backend.fastapi.job_store import PersistentJobs
+    async def _enrich_contacts(client, rows):
+        """Resolve public OSM contact tags in batches after Photon discovery.
+        Photon is used for fast discovery but does not reliably expose contact tags.
+        Nominatim lookup can return website/phone/email from OSM extratags in one
+        request for a batch, avoiding one request per business.
+        """
+        wanted = {}
+        for row in rows:
+            match = re.match(r"osm:(node|way|relation):(.+)$", str(row.get("source_id") or ""))
+            if not match:
+                continue
+            typ = {"node": "N", "way": "W", "relation": "R"}[match.group(1)]
+            osm_id = match.group(2)
+            wanted[f"{typ}{osm_id}"] = row
+        if not wanted:
+            return rows
+        keys = list(wanted)
+        for start in range(0, len(keys), 50):
+            if start:
+                await asyncio.sleep(1.1)
+            batch = keys[start:start + 50]
+            try:
+                response = await client.get(
+                    "https://nominatim.openstreetmap.org/lookup",
+                    params={
+                        "osm_ids": ",".join(batch),
+                        "format": "jsonv2",
+                        "addressdetails": 1,
+                        "extratags": 1,
+                    },
+                    headers={"User-Agent": _lf.UA, "Referer": "https://leadflowautomations.github.io/"},
+                )
+                response.raise_for_status()
+                for result in response.json():
+                    typ = {"N": "node", "W": "way", "R": "relation"}.get(str(result.get("osm_type") or "")[0:1])
+                    key = f"{str(result.get('osm_type') or '')}{result.get('osm_id')}"
+                    # Nominatim uses node/way/relation strings; normalize to lookup keys.
+                    if not typ:
+                        raw = str(result.get("osm_type") or "")
+                        typ = raw if raw in {"node", "way", "relation"} else None
+                    if typ:
+                        key = f"{'N' if typ == 'node' else 'W' if typ == 'way' else 'R'}{result.get('osm_id')}"
+                    row = wanted.get(key)
+                    if not row:
+                        continue
+                    extra = result.get("extratags") or {}
+                    website = extra.get("contact:website") or extra.get("website")
+                    phone = extra.get("contact:phone") or extra.get("phone")
+                    email = extra.get("contact:email") or extra.get("email")
+                    if website and not row.get("website"):
+                        row["website"] = _lf.clean_url(website)
+                    if phone and not row.get("phone"):
+                        row["phone"] = _lf.clean_phone(phone)
+                    if email and not row.get("email"):
+                        row["email"] = _lf.clean_email(email)
+            except Exception as exc:
+                print(f"Lead Flow OSM contact enrichment skipped: {exc}", flush=True)
+        return rows
 
+    _original_discover = _lf.discover
+
+    async def _discover_with_contacts(city, industry, country, job):
+        rows = await _original_discover(city, industry, country, job)
+        if rows:
+            async with __import__("httpx").AsyncClient(timeout=_lf.TIMEOUT) as client:
+                rows = await _enrich_contacts(client, rows)
+        return rows
+
+    _lf.discover = _discover_with_contacts
+
+    from backend.fastapi.job_store import PersistentJobs
     _lf.JOBS = PersistentJobs()
-    print(
-        f"Lead Flow durable job store active: {getattr(_lf.JOBS, 'persistent', False)}",
-        flush=True,
-    )
+    print(f"Lead Flow durable job store active: {getattr(_lf.JOBS, 'persistent', False)}", flush=True)
 except Exception as exc:
     print(f"Lead Flow runtime bootstrap unavailable: {exc}", flush=True)
