@@ -120,9 +120,22 @@ async def nominatim_search(client: httpx.AsyncClient, query: str, lat: float, lo
     return response.json()
 
 
-async def discover(city: str, industry: str, country: str, job: dict[str, Any]) -> list[dict[str, Any]]:
+async def discover_fallback(city: str, industry: str, country: str, job: dict[str, Any]) -> list[dict[str, Any]]:
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-        center = await geocode(client, city, country)
+        try:
+            center = await geocode(client, city, country)
+        except Exception as exc:
+            # Location lookup is an external dependency.  A temporary provider
+            # failure must finish the job honestly, rather than fail the whole
+            # research pipeline before it has a chance to return a result.
+            job["errors"] += 1
+            job["last_error"] = f"geocoding: {str(exc)[:250]}"
+            job.update(
+                stage="collect",
+                message="Location lookup is temporarily unavailable; no candidates could be collected.",
+                updated_at=time.time(),
+            )
+            return []
         if not center:
             return []
         lat, lon = center
@@ -156,6 +169,36 @@ async def discover(city: str, industry: str, country: str, job: dict[str, Any]) 
                 job["last_error"] = f"discovery: {str(exc)[:250]}"
             job.update(collection_completed=completed, discovered=len(dedupe(rows)), updated_at=time.time())
         return dedupe(rows)
+
+
+async def discover(city: str, industry: str, country: str, job: dict[str, Any]) -> list[dict[str, Any]]:
+    """Use the adaptive Overpass pipeline, with the bounded OSM fallback.
+
+    ``exhaustive_discovery`` was previously present in the repository but was
+    not connected to the production job path, leaving the obsolete fixed 3x3
+    Nominatim search active.  Keep the fallback explicit so a failure in one
+    discovery strategy cannot abort the complete prospecting job.
+    """
+    try:
+        from .exhaustive_discovery import discover_exhaustive
+
+        return await discover_exhaustive(
+            lf=__import__(__name__, fromlist=["app"]),
+            city=city,
+            industry=industry,
+            country=country,
+            job=job,
+            fallback=discover_fallback,
+        )
+    except Exception as exc:
+        job["errors"] += 1
+        job["last_error"] = f"adaptive discovery: {str(exc)[:250]}"
+        job.update(
+            stage="collect",
+            message="Adaptive discovery was unavailable; trying the OSM fallback…",
+            updated_at=time.time(),
+        )
+        return await discover_fallback(city, industry, country, job)
 
 
 def extract_emails(html: str) -> list[str]:
@@ -419,3 +462,4 @@ async def export_csv(job_id: str):
             "automation_action": row.get("automation", {}).get("action"), "outreach_ready": row.get("automation", {}).get("outreach_ready"),
         })
     return output.getvalue()
+
